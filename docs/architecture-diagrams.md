@@ -1,0 +1,33 @@
+# Earn system architecture
+
+Deployed modular monolith and financial data flow
+
+## Application boundaries and report delivery
+
+<!-- mermaid:id=system -->
+```mermaid
+flowchart TB
+  browser["Browser dashboard and report preview"]
+  auth["Better Auth session and current user"]
+  api["Next.js private API with role checks"]
+  validation["Zod validation and business rules"]
+  services["Production salary expense and cash services"]
+  prisma["Prisma ORM and transactions"]
+  db["Neon PostgreSQL with audit history"]
+  reports["Consistent reporting snapshot"]
+  pdf["Server PDF generator"]
+  download["Private PDF response"]
+  browser -->|Sign in| auth
+  browser -->|Session cookie| api
+  auth -->|Verified identity| api
+  api -->|Permission granted| validation
+  validation -->|Valid input| services
+  services -->|Atomic mutation and audit| prisma
+  prisma -->|Encrypted connection| db
+  api -->|Authorized report request| reports
+  reports -->|Repeatable-read query| prisma
+  reports -->|Server-calculated totals| pdf
+  pdf -->|Stream PDF| download
+  download -->|Preview or download| browser
+%% portable-canonical-v2:eyJhY2Nlc3NpYmlsaXR5IjpudWxsLCJkYXRhIjp7ImRpcmVjdGlvbiI6IlRCIiwiZWRnZXMiOlt7ImZyb20iOiJicm93c2VyIiwibGFiZWwiOiJTaWduIGluIiwidG8iOiJhdXRoIn0seyJmcm9tIjoiYnJvd3NlciIsImxhYmVsIjoiU2Vzc2lvbiBjb29raWUiLCJ0byI6ImFwaSJ9LHsiZnJvbSI6ImF1dGgiLCJsYWJlbCI6IlZlcmlmaWVkIGlkZW50aXR5IiwidG8iOiJhcGkifSx7ImZyb20iOiJhcGkiLCJsYWJlbCI6IlBlcm1pc3Npb24gZ3JhbnRlZCIsInRvIjoidmFsaWRhdGlvbiJ9LHsiZnJvbSI6InZhbGlkYXRpb24iLCJsYWJlbCI6IlZhbGlkIGlucHV0IiwidG8iOiJzZXJ2aWNlcyJ9LHsiZnJvbSI6InNlcnZpY2VzIiwibGFiZWwiOiJBdG9taWMgbXV0YXRpb24gYW5kIGF1ZGl0IiwidG8iOiJwcmlzbWEifSx7ImZyb20iOiJwcmlzbWEiLCJsYWJlbCI6IkVuY3J5cHRlZCBjb25uZWN0aW9uIiwidG8iOiJkYiJ9LHsiZnJvbSI6ImFwaSIsImxhYmVsIjoiQXV0aG9yaXplZCByZXBvcnQgcmVxdWVzdCIsInRvIjoicmVwb3J0cyJ9LHsiZnJvbSI6InJlcG9ydHMiLCJsYWJlbCI6IlJlcGVhdGFibGUtcmVhZCBxdWVyeSIsInRvIjoicHJpc21hIn0seyJmcm9tIjoicmVwb3J0cyIsImxhYmVsIjoiU2VydmVyLWNhbGN1bGF0ZWQgdG90YWxzIiwidG8iOiJwZGYifSx7ImZyb20iOiJwZGYiLCJsYWJlbCI6IlN0cmVhbSBQREYiLCJ0byI6ImRvd25sb2FkIn0seyJmcm9tIjoiZG93bmxvYWQiLCJsYWJlbCI6IlByZXZpZXcgb3IgZG93bmxvYWQiLCJ0byI6ImJyb3dzZXIifV0sIm5vZGVzIjpbeyJpZCI6ImJyb3dzZXIiLCJsYWJlbCI6IkJyb3dzZXIgZGFzaGJvYXJkIGFuZCByZXBvcnQgcHJldmlldyJ9LHsiaWQiOiJhdXRoIiwibGFiZWwiOiJCZXR0ZXIgQXV0aCBzZXNzaW9uIGFuZCBjdXJyZW50IHVzZXIifSx7ImlkIjoiYXBpIiwibGFiZWwiOiJOZXh0LmpzIHByaXZhdGUgQVBJIHdpdGggcm9sZSBjaGVja3MifSx7ImlkIjoidmFsaWRhdGlvbiIsImxhYmVsIjoiWm9kIHZhbGlkYXRpb24gYW5kIGJ1c2luZXNzIHJ1bGVzIn0seyJpZCI6InNlcnZpY2VzIiwibGFiZWwiOiJQcm9kdWN0aW9uIHNhbGFyeSBleHBlbnNlIGFuZCBjYXNoIHNlcnZpY2VzIn0seyJpZCI6InByaXNtYSIsImxhYmVsIjoiUHJpc21hIE9STSBhbmQgdHJhbnNhY3Rpb25zIn0seyJpZCI6ImRiIiwibGFiZWwiOiJOZW9uIFBvc3RncmVTUUwgd2l0aCBhdWRpdCBoaXN0b3J5In0seyJpZCI6InJlcG9ydHMiLCJsYWJlbCI6IkNvbnNpc3RlbnQgcmVwb3J0aW5nIHNuYXBzaG90In0seyJpZCI6InBkZiIsImxhYmVsIjoiU2VydmVyIFBERiBnZW5lcmF0b3IifSx7ImlkIjoiZG93bmxvYWQiLCJsYWJlbCI6IlByaXZhdGUgUERGIHJlc3BvbnNlIn1dfSwiZGVzY3JpcHRpb24iOm51bGwsImlkIjoic3lzdGVtIiwia2luZCI6ImZsb3djaGFydCIsInNvdXJjZVNoYTI1NiI6IjQ3ZDk3MTkwMmRlZTRhMjhiODUxOWRjMTJjNzFjNzFhOTQ0M2RjYzBiMTM0M2I2NWNkZmE5MzhmNDA4NjViZjAiLCJzdHlsZXMiOltdLCJ0aXRsZSI6IkFwcGxpY2F0aW9uIGJvdW5kYXJpZXMgYW5kIHJlcG9ydCBkZWxpdmVyeSIsInZlcnNpb24iOjF9
+```

@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
 export const metadata: Metadata = {
-  title: "Earn — A good place to start",
-  description: "Small beginnings. Big possibilities. Your Next.js foundation, connected to Neon Postgres and ready to grow.",
+  title: "Earn — Business dashboard",
+  description:
+    "Daily production, salaries, expenses, cash flow and monthly reports in one workspace.",
+  robots: { index: false, follow: false },
 };
-
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.dataset.theme=localStorage.getItem('earn-theme')||'dark'}catch{}`,
+          }}
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
 }

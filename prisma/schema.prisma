@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          String    @default("viewer")
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("earn_users")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("earn_sessions")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("earn_accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("earn_verifications")
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("earn_rate_limits")
+}
+
+model Workspace {
+  id          String   @id @default("default")
+  name        String   @default("Earn Workspace")
+  currency    String   @default("USD")
+  timezone    String   @default("Asia/Dhaka")
+  openingCash Decimal  @default(0) @db.Decimal(14, 2)
+  openingDate DateTime @db.Date
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("earn_workspace")
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  position  String
+  dailyRate Decimal  @db.Decimal(14, 2)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  salaries  Salary[]
+
+  @@map("earn_employees")
+}
+
+model Production {
+  id          String    @id @default(cuid())
+  date        DateTime  @db.Date
+  description String
+  quantity    Decimal   @db.Decimal(14, 3)
+  unit        String    @default("pieces")
+  unitRate    Decimal   @db.Decimal(14, 2)
+  amount      Decimal   @db.Decimal(14, 2)
+  paidOn      DateTime? @db.Date
+  notes       String    @default("")
+  createdBy   String
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([date, voidedAt])
+  @@index([paidOn])
+  @@map("earn_production")
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  date        DateTime  @db.Date
+  description String
+  category    String
+  amount      Decimal   @db.Decimal(14, 2)
+  paidOn      DateTime? @db.Date
+  notes       String    @default("")
+  createdBy   String
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([date, voidedAt])
+  @@index([paidOn])
+  @@map("earn_expenses")
+}
+
+model Salary {
+  id         String    @id @default(cuid())
+  date       DateTime  @db.Date
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  daysWorked Decimal   @db.Decimal(3, 2)
+  dailyRate  Decimal   @db.Decimal(14, 2)
+  amount     Decimal   @db.Decimal(14, 2)
+  paidOn     DateTime? @db.Date
+  notes      String    @default("")
+  createdBy  String
+  voidedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([date, voidedAt])
+  @@index([employeeId, date])
+  @@index([paidOn])
+  @@map("earn_salaries")
+}
+
+model CashEntry {
+  id          String    @id @default(cuid())
+  date        DateTime  @db.Date
+  description String
+  direction   String
+  amount      Decimal   @db.Decimal(14, 2)
+  notes       String    @default("")
+  createdBy   String
+  voidedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([date, voidedAt])
+  @@map("earn_cash_entries")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String
+  actorName String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("earn_audit_logs")
+}

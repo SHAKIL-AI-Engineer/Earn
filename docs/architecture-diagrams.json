@@ -1,0 +1,119 @@
+{
+  "version": 2,
+  "title": "Earn system architecture",
+  "description": "Deployed modular monolith and financial data flow",
+  "diagrams": [
+    {
+      "id": "system",
+      "title": "Application boundaries and report delivery",
+      "kind": "flowchart",
+      "data": {
+        "direction": "TB",
+        "nodes": [
+          {
+            "id": "browser",
+            "label": "Browser dashboard and report preview"
+          },
+          {
+            "id": "auth",
+            "label": "Better Auth session and current user"
+          },
+          {
+            "id": "api",
+            "label": "Next.js private API with role checks"
+          },
+          {
+            "id": "validation",
+            "label": "Zod validation and business rules"
+          },
+          {
+            "id": "services",
+            "label": "Production salary expense and cash services"
+          },
+          {
+            "id": "prisma",
+            "label": "Prisma ORM and transactions"
+          },
+          {
+            "id": "db",
+            "label": "Neon PostgreSQL with audit history"
+          },
+          {
+            "id": "reports",
+            "label": "Consistent reporting snapshot"
+          },
+          {
+            "id": "pdf",
+            "label": "Server PDF generator"
+          },
+          {
+            "id": "download",
+            "label": "Private PDF response"
+          }
+        ],
+        "edges": [
+          {
+            "from": "browser",
+            "to": "auth",
+            "label": "Sign in"
+          },
+          {
+            "from": "browser",
+            "to": "api",
+            "label": "Session cookie"
+          },
+          {
+            "from": "auth",
+            "to": "api",
+            "label": "Verified identity"
+          },
+          {
+            "from": "api",
+            "to": "validation",
+            "label": "Permission granted"
+          },
+          {
+            "from": "validation",
+            "to": "services",
+            "label": "Valid input"
+          },
+          {
+            "from": "services",
+            "to": "prisma",
+            "label": "Atomic mutation and audit"
+          },
+          {
+            "from": "prisma",
+            "to": "db",
+            "label": "Encrypted connection"
+          },
+          {
+            "from": "api",
+            "to": "reports",
+            "label": "Authorized report request"
+          },
+          {
+            "from": "reports",
+            "to": "prisma",
+            "label": "Repeatable-read query"
+          },
+          {
+            "from": "reports",
+            "to": "pdf",
+            "label": "Server-calculated totals"
+          },
+          {
+            "from": "pdf",
+            "to": "download",
+            "label": "Stream PDF"
+          },
+          {
+            "from": "download",
+            "to": "browser",
+            "label": "Preview or download"
+          }
+        ]
+      }
+    }
+  ]
+}
