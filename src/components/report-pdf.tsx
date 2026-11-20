@@ -1,6 +1,33 @@
-import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  StyleSheet,
+  Font,
+} from "@react-pdf/renderer";
+import type { Style } from "@react-pdf/types";
 import type { report } from "@/lib/reports";
+import path from "node:path";
 import { formatMoney } from "@/lib/finance";
+Font.register({
+  family: "NotoBengali",
+  src: path.join(process.cwd(), "public/fonts/NotoSansBengali-Regular.ttf"),
+});
+function CurrencyText({ value, style }: { value: string; style?: Style }) {
+  return (
+    <Text style={style}>
+      {value.split("৳").map((part, index) => (
+        <Text key={index}>
+          {index > 0 ? (
+            <Text style={{ fontFamily: "NotoBengali" }}>৳</Text>
+          ) : null}
+          {part}
+        </Text>
+      ))}
+    </Text>
+  );
+}
 export type PdfData = Awaited<ReturnType<typeof report>>;
 export type PdfRow = {
   date: string;
@@ -106,7 +133,7 @@ export function ReportPdf({
         <View style={s.header}>
           <Text style={s.brand}>earn.</Text>
           <Text style={s.workspace}>
-            {data.workspace.name} · USD · {data.workspace.timezone}
+            {data.workspace.name} · BDT · {data.workspace.timezone}
           </Text>
           <Text style={s.title}>
             {data.period.mode === "daily" ? "Daily report" : "Monthly summary"}
@@ -123,7 +150,7 @@ export function ReportPdf({
           ].map(([label, value]) => (
             <View key={label} style={s.metric}>
               <Text style={s.label}>{label}</Text>
-              <Text style={s.value}>{formatMoney(value)}</Text>
+              <CurrencyText style={s.value} value={formatMoney(value)} />
             </View>
           ))}
         </View>
@@ -136,7 +163,7 @@ export function ReportPdf({
         ].map(([label, value]) => (
           <View key={label} style={s.cash}>
             <Text>{label}</Text>
-            <Text>{formatMoney(value)}</Text>
+            <CurrencyText value={formatMoney(value)} />
           </View>
         ))}
         <Text style={s.section}>Cash flow</Text>
@@ -148,7 +175,7 @@ export function ReportPdf({
         ].map(([label, value]) => (
           <View key={label} style={s.cash}>
             <Text>{label}</Text>
-            <Text>{formatMoney(value)}</Text>
+            <CurrencyText value={formatMoney(value)} />
           </View>
         ))}
         {sections.map((section) => (
@@ -166,9 +193,12 @@ export function ReportPdf({
                 <View key={i} style={s.tr} wrap={false}>
                   <Text style={s.date}>{r.date}</Text>
                   <Text style={s.description}>{r.label}</Text>
-                  <Text style={s.detail}>{r.detail}</Text>
+                  <CurrencyText style={s.detail} value={r.detail} />
                   <Text style={s.status}>{r.status}</Text>
-                  <Text style={s.amount}>{formatMoney(r.amount)}</Text>
+                  <CurrencyText
+                    style={s.amount}
+                    value={formatMoney(r.amount)}
+                  />
                 </View>
               ))
             ) : (

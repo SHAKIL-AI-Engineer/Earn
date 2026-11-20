@@ -224,7 +224,7 @@ export function ExportDialog({
             ) : (
               <div className="preview-paper">
                 <div className="preview-brand">earn.</div>
-                <span className="small muted">{data.workspace.name} · USD</span>
+                <span className="small muted">{data.workspace.name} · BDT</span>
                 <h3>{mode === "daily" ? "Daily report" : "Monthly summary"}</h3>
                 <p>{mode === "daily" ? date : selectedMonth}</p>
                 <div className="preview-metrics">

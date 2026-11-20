@@ -33,7 +33,7 @@ For this workspace, the one-time key is also available in the private, ignored `
 5. Use cash adjustments only for owner contributions and withdrawals; paid production, expenses and salaries already enter cash flow automatically.
 6. Choose a day or month. Export a summary or detailed PDF, select sections and orientation, generate a preview, and download that exact report.
 
-Amounts are USD. Net earnings deduct both operating expenses and salaries. Cash flow uses payment dates, so it can differ from earnings. Voiding an entry removes it from totals while preserving its original record and audit history. Updates detect stale edits rather than silently overwriting them.
+Amounts are BDT (৳). Net earnings deduct both operating expenses and salaries. Cash flow uses payment dates, so it can differ from earnings. Voiding an entry removes it from totals while preserving its original record and audit history. Updates detect stale edits rather than silently overwriting them.
 
 ## Checks
 
@@ -68,4 +68,4 @@ Required production variables: `DATABASE_URL`, `DATABASE_SCHEMA=earn`, `BETTER_A
 
 Vercel's GitHub app must be granted repository access before automatic Git deployments can be enabled. Direct source upload is used for the initial releases. Vercel deployment protection remains enabled; application login is a separate layer.
 
-The first release supports one workspace, full-payment records, USD, and 2,000 detail rows per PDF section. It does not implement tax accounting, multi-currency, approval workflows, immutable monthly close, or self-service email password recovery. See the architecture document for growth and backup/restore considerations.
+The first release supports one workspace, full-payment records, BDT (৳), and 2,000 detail rows per PDF section. It does not implement tax accounting, multi-currency, approval workflows, immutable monthly close, or self-service email password recovery. See the architecture document for growth and backup/restore considerations.

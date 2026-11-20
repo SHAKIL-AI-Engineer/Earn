@@ -3,6 +3,7 @@ import { actor, failure, HttpError, json } from "@/lib/http";
 import { kinds, type Kind } from "@/lib/permissions";
 import { periodFrom, report } from "@/lib/reports";
 import { cashbook } from "@/lib/cashbook";
+import { tableOptions, tableOrder } from "@/lib/table-options";
 import { resource } from "@/lib/records";
 export async function GET(request: Request) {
   try {
@@ -11,7 +12,17 @@ export async function GET(request: Request) {
     const period = periodFrom(q);
     const kind = (q.get("kind") || "production") as Kind;
     if (!kinds.includes(kind)) throw new HttpError(400, "Unknown record type.");
-    const page = Math.max(1, Math.min(100000, Number(q.get("page")) || 1));
+    let options;
+    try {
+      options = tableOptions(q, kind);
+    } catch (e) {
+      throw new HttpError(
+        400,
+        e instanceof Error ? e.message : "Invalid table options.",
+      );
+    }
+    const { page, pageSize, sort, direction } = options;
+    const includeSummary = q.get("summary") !== "0";
     const search = (q.get("search") || "").slice(0, 100);
     const status = q.get("status");
     const where =
@@ -49,26 +60,31 @@ export async function GET(request: Request) {
     const model = resource(db(), kind);
     const [summary, normalRows, normalCount, employees, audit] =
       await Promise.all([
-        report(period),
-        model.findMany({
-          where,
-          orderBy:
-            kind === "employee"
-              ? { name: "asc" }
-              : [{ date: "desc" }, { createdAt: "desc" }],
-          skip: (page - 1) * 20,
-          take: 20,
-          ...(kind === "salary"
-            ? { include: { employee: { select: { name: true, code: true } } } }
-            : {}),
-        }),
-        model.count({ where }),
-        db().employee.findMany({
-          where: { active: true },
-          orderBy: { name: "asc" },
-          take: 500,
-        }),
-        user.role === "admin"
+        includeSummary ? report(period) : Promise.resolve({}),
+        kind === "cashEntry"
+          ? Promise.resolve([])
+          : model.findMany({
+              where,
+              orderBy: tableOrder(kind, sort, direction),
+              skip: (page - 1) * pageSize,
+              take: pageSize,
+              ...(kind === "salary"
+                ? {
+                    include: {
+                      employee: { select: { name: true, code: true } },
+                    },
+                  }
+                : {}),
+            }),
+        kind === "cashEntry" ? Promise.resolve(0) : model.count({ where }),
+        includeSummary
+          ? db().employee.findMany({
+              where: { active: true },
+              orderBy: { name: "asc" },
+              take: 500,
+            })
+          : Promise.resolve(undefined),
+        includeSummary && user.role === "admin"
           ? db().auditLog.findMany({
               orderBy: { createdAt: "desc" },
               take: 15,
@@ -80,20 +96,74 @@ export async function GET(request: Request) {
                 createdAt: true,
               },
             })
-          : Promise.resolve([]),
+          : Promise.resolve(undefined),
       ]);
-    const cashRows =
+    let cashRows =
       kind === "cashEntry"
-        ? await cashbook(period.start, period.end, search, page)
+        ? await cashbook(
+            period.start,
+            period.end,
+            search,
+            page,
+            pageSize,
+            db(),
+            { sort, direction },
+          )
         : null;
-    const rows = cashRows
-      ? cashRows.map(({ total, ...row }) => {
-          void total;
-          return row;
-        })
-      : normalRows;
-    const count = cashRows ? Number(cashRows[0]?.total || 0) : normalCount;
-    return json({ ...summary, user, rows, count, page, employees, audit });
+    let count = cashRows ? Number(cashRows[0]?.total || 0) : normalCount;
+    if (cashRows && !cashRows.length && page > 1) {
+      const first = await cashbook(
+        period.start,
+        period.end,
+        search,
+        1,
+        pageSize,
+        db(),
+        { sort, direction },
+      );
+      count = Number(first[0]?.total || 0);
+    }
+    const effectivePage = Math.min(
+      page,
+      Math.max(1, Math.ceil(count / pageSize)),
+    );
+    let rows = normalRows;
+    if (kind === "cashEntry") {
+      if (effectivePage !== page)
+        cashRows = await cashbook(
+          period.start,
+          period.end,
+          search,
+          effectivePage,
+          pageSize,
+          db(),
+          { sort, direction },
+        );
+      rows = (cashRows || []).map(({ total, ...row }) => {
+        void total;
+        return row;
+      });
+    } else if (effectivePage !== page)
+      rows = await model.findMany({
+        where,
+        orderBy: tableOrder(kind, sort, direction),
+        skip: (effectivePage - 1) * pageSize,
+        take: pageSize,
+        ...(kind === "salary"
+          ? { include: { employee: { select: { name: true, code: true } } } }
+          : {}),
+      });
+    return json({
+      ...summary,
+      user,
+      rows,
+      count,
+      page: effectivePage,
+      pageSize,
+      sort,
+      direction,
+      ...(includeSummary ? { employees, audit: audit || [] } : {}),
+    });
   } catch (e) {
     return failure(e);
   }

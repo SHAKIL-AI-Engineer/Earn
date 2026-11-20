@@ -25,9 +25,13 @@ export function cashBalance(
 ) {
   return money(D(opening).plus(incoming).minus(outgoing)).toFixed(2);
 }
+export const CURRENCY_CODE = "BDT";
+export const CURRENCY_SYMBOL = "৳";
+const numberFormatter = new Intl.NumberFormat("en-BD", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 export function formatMoney(n: string | number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(n));
+  const value = Number(n);
+  return `${value < 0 ? "-" : ""}${CURRENCY_SYMBOL}\u00a0${numberFormatter.format(Math.abs(value))}`;
 }

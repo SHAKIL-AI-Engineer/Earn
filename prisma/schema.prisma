@@ -82,7 +82,7 @@ model RateLimit {
 model Workspace {
   id          String   @id @default("default")
   name        String   @default("Earn Workspace")
-  currency    String   @default("USD")
+  currency    String   @default("BDT")
   timezone    String   @default("Asia/Dhaka")
   openingCash Decimal  @default(0) @db.Decimal(14, 2)
   openingDate DateTime @db.Date

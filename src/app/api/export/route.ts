@@ -41,7 +41,7 @@ export async function GET(request: Request) {
               rows: rows.map((r) => ({
                 date: dt(r.date),
                 label: r.description,
-                detail: `${r.quantity} ${r.unit} × $${r.unitRate}`,
+                detail: `${r.quantity} ${r.unit} × ৳${r.unitRate}`,
                 amount: r.amount.toFixed(2),
                 status: r.paidOn ? `Paid ${dt(r.paidOn)}` : "Pending",
               })),
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
               rows: rows.map((r) => ({
                 date: dt(r.date),
                 label: r.employee.name,
-                detail: `${r.daysWorked} day × $${r.dailyRate}`,
+                detail: `${r.daysWorked} day × ৳${r.dailyRate}`,
                 amount: r.amount.toFixed(2),
                 status: r.paidOn ? `Paid ${dt(r.paidOn)}` : "Pending",
               })),

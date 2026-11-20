@@ -1,6 +1,6 @@
 # Verification — 20 November 2026
 
-The updated dashboard passed lint, TypeScript, the production build, and all five financial/permission unit tests. End-to-end checks ran against `next start` with a disposable `earn_test_` PostgreSQL schema. No fixtures or default users were added to the production `earn` workspace.
+The updated dashboard passed lint, TypeScript, the production build, and all eight financial/permission/table unit tests. End-to-end checks ran against `next start` with a disposable `earn_test_` PostgreSQL schema. No fixtures or default users were added to the production `earn` workspace.
 
 Verified flows:
 
@@ -17,4 +17,12 @@ Verified flows:
 - No browser runtime errors occurred. Source and built browser bundles passed a scan for the database password, authentication secret, and initial-setup secret.
 - Architecture canonical JSON passed JSON Schema validation and the skill's static Mermaid lint. The supplied SVG is a structural preview, not a native renderer assertion.
 
-Limits: these checks are functional, not a penetration test, load test, backup restore rehearsal, or independent financial audit. The first administrator still needs to complete production setup using the private key. The owner explicitly authorized storing the newly generated application secrets in the existing Vercel project earn and deploying the tested update. The first administrator is intentionally left for the owner to create using the private setup key.
+Limits: these checks are functional, not a penetration test, load test, backup restore rehearsal, or independent financial audit. The owner explicitly authorized storing the newly generated application secrets in the existing Vercel project earn and deploying the tested update. The requested production administrator has since been provisioned and sign-in verified.
+
+## Currency and table update
+
+- BDT formatter tests cover zero, cents, grouping, and negative values; existing arithmetic tests still pass.
+- Taka currency glyphs are present in extracted PDF text, with no dollar signs. The font is included in the export function trace.
+- Server-side sorting is verified against 24 matching records across 10-row pages, including page bounds and invalid-page-size rejection. Table-only responses omit report aggregates.
+- Desktop column sorting, page-size and density controls, mobile sorting/cards, light/dark UI and PDF preview pass browser checks without runtime errors or horizontal page overflow.
+- Fixtures remain isolated in a disposable test schema. Monetary totals and account counts are compared before/after the production currency metadata migration.

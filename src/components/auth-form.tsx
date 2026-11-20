@@ -189,7 +189,7 @@ export function AuthForm({ setup = false }: { setup?: boolean }) {
           </button>
           <p className="small muted">
             {setup
-              ? "USD · Daily-rate salaries · Asia/Dhaka reporting dates"
+              ? "BDT · Daily-rate salaries · Asia/Dhaka reporting dates"
               : "Need an account or a password reset? Contact your workspace administrator."}
           </p>
         </form>

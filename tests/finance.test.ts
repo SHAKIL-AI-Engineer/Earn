@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cashBalance, productAmount, statement } from "../src/lib/finance";
+import {
+  cashBalance,
+  formatMoney,
+  productAmount,
+  statement,
+} from "../src/lib/finance";
 import { canExport, canWrite } from "../src/lib/permissions";
 import { dateText, salaryInput } from "../src/lib/validation";
 test("financial multiplication rounds each record using decimal half-up", () => {
@@ -41,4 +46,10 @@ test("salary fractions are bounded to a single working day and dates are real", 
   );
   assert.equal(dateText.safeParse("2026-02-30").success, false);
   assert.equal(dateText.safeParse("2028-02-29").success, true);
+});
+
+test("taka formatting preserves grouping, cents, negatives and zero", () => {
+  assert.equal(formatMoney("1234567.89"), "৳\u00a01,234,567.89");
+  assert.equal(formatMoney("-1.25"), "-৳\u00a01.25");
+  assert.equal(formatMoney(0), "৳\u00a00.00");
 });

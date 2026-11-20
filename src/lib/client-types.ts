@@ -47,6 +47,7 @@ export type WorkspaceData = {
   employees: RecordRow[];
   count: number;
   page: number;
+  pageSize: number;
   audit: {
     id: string;
     actorName: string;

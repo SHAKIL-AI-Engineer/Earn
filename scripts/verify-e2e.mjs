@@ -315,7 +315,7 @@ try {
   await page
     .getByLabel("Description", { exact: true })
     .fill("Office stationery");
-  await page.getByLabel("Amount ($)", { exact: true }).fill("2.50");
+  await page.getByLabel("Amount (৳)", { exact: true }).fill("2.50");
   await page.getByLabel("Entry date").fill(day);
   await page.getByRole("button", { name: "Save entry", exact: true }).click();
   await page
@@ -375,6 +375,81 @@ try {
   assert.equal(data.totals.expenses, "9.50");
   assert.equal(data.totals.closingCash, "173.00");
   assert.ok(data.audit.some((a) => a.action === "VOID"));
+  // Sort and paginate the entire matching dataset, not just the visible rows.
+  for (let offset = 0; offset < 24; offset += 4)
+    await Promise.all(
+      Array.from({ length: Math.min(4, 24 - offset) }, (_, i) =>
+        create("expense", {
+          description: `Table sample ${String(offset + i + 1).padStart(2, "0")}`,
+          category: "Office",
+          amount: String(offset + i + 1),
+          paidOn: null,
+        }),
+      ),
+    );
+  const sorted = await request(
+    "/api/workspace?kind=expense&month=2026-11&search=Table%20sample&pageSize=10&sort=amount&direction=desc&summary=0",
+    null,
+    "GET",
+  );
+  assert.equal(sorted.count, 24);
+  assert.equal(sorted.rows.length, 10);
+  assert.equal(sorted.rows[0].amount, "24");
+  assert.equal(sorted.totals, undefined);
+  const second = await request(
+    "/api/workspace?kind=expense&month=2026-11&search=Table%20sample&pageSize=10&page=2&sort=amount&direction=desc&summary=0",
+    null,
+    "GET",
+  );
+  assert.equal(second.rows[0].amount, "14");
+  const clamped = await request(
+    "/api/workspace?kind=expense&month=2026-11&search=Table%20sample&pageSize=10&page=99&sort=amount&direction=desc&summary=0",
+    null,
+    "GET",
+  );
+  assert.equal(clamped.page, 3);
+  assert.equal(clamped.rows.length, 4);
+  await request("/api/workspace?pageSize=7", null, "GET", context, 400);
+  await page.setViewportSize({ width: 1440, height: 1050 });
+  await page.goto(base + "/expenses");
+  await page.getByLabel("Search records").fill("Table sample");
+  await page
+    .getByText(/^Table sample \d+$/)
+    .first()
+    .waitFor();
+  const sizeRequest = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/workspace?") &&
+      new URL(r.url()).searchParams.get("pageSize") === "10",
+  );
+  await page.getByLabel("Rows per page").selectOption("10");
+  await sizeRequest;
+  const orderRequest = page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/workspace?") &&
+      new URL(r.url()).searchParams.get("sort") === "amount",
+  );
+  await page.getByRole("button", { name: "Amount", exact: true }).click();
+  await orderRequest;
+  await page
+    .getByRole("columnheader", { name: "Amount", exact: true })
+    .evaluate((el) => el.getAttribute("aria-sort"))
+    .then((value) => assert.equal(value, "ascending"));
+  await page.getByRole("button", { name: "Use compact rows" }).click();
+  await page.screenshot({ path: out + "/table-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel("Sort records").selectOption("amount:desc");
+  await page.getByText("Table sample 24", { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+  await page.screenshot({ path: out + "/table-mobile.png", fullPage: true });
+  const bodyText = await page.locator("body").innerText();
+  assert.ok(bodyText.includes("৳"));
+  assert.equal(bodyText.includes("$"), false);
   assert.deepEqual(errors, [], "Browser runtime errors");
   console.log(
     "PASS: setup, login, role boundaries, CSRF, decimal reports, payment-date cash flow, duplicate/stale protection, account revocation, PDF, UI form, themes, mobile, void audit.",

@@ -147,7 +147,7 @@ export function RecordForm({
               </label>
               <div className="form-grid">
                 <label>
-                  Daily rate ($)
+                  Daily rate (৳)
                   <input
                     name="dailyRate"
                     type="number"
@@ -230,7 +230,7 @@ export function RecordForm({
                       />
                     </label>
                     <label>
-                      Rate per unit ($)
+                      Rate per unit (৳)
                       <input
                         name="unitRate"
                         type="number"
@@ -270,7 +270,7 @@ export function RecordForm({
                     />
                   </label>
                   <label>
-                    Daily rate ($)
+                    Daily rate (৳)
                     <input
                       name="dailyRate"
                       type="number"
@@ -287,7 +287,7 @@ export function RecordForm({
               {(kind === "expense" || kind === "cashEntry") && (
                 <div className="form-grid">
                   <label>
-                    Amount ($)
+                    Amount (৳)
                     <input
                       name="amount"
                       type="number"

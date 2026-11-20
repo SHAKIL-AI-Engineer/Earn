@@ -2,7 +2,7 @@
 
 Earn is a single-business operations and reporting application. It records production earnings, daily-rate salaries, operating expenses, and actual cash activity. The application is deployed as a modular Next.js monolith on Vercel, with Prisma 7 and Neon PostgreSQL. Better Auth owns password verification and sessions. Reports are generated from server-side calculations and streamed as private PDFs.
 
-This is a working first release, not a complete general ledger, tax system, or multi-tenant accounting platform. All amounts are USD; reporting calendar dates follow Asia/Dhaka. See [the editable architecture diagrams](architecture-diagrams.md), [canonical diagram source](architecture-diagrams.json), and [structural preview](architecture-preview.svg). The diagram was statically validated; the preview is a structural SVG, not evidence from a native Mermaid renderer.
+This is a working first release, not a complete general ledger, tax system, or multi-tenant accounting platform. All amounts are BDT (৳); reporting calendar dates follow Asia/Dhaka. See [the editable architecture diagrams](architecture-diagrams.md), [canonical diagram source](architecture-diagrams.json), and [structural preview](architecture-preview.svg). The diagram was statically validated; the preview is a structural SVG, not evidence from a native Mermaid renderer.
 
 ## System boundaries
 
@@ -22,7 +22,7 @@ Browser → session cookie → API authorization → Zod validation → business
 
 | Model                                        | Main fields and relations                                           | Invariants                                                                    |
 | -------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Workspace                                    | Name, currency, timezone, opening cash/date                         | Single row `default`; USD and calendar fixed for this release                 |
+| Workspace                                    | Name, currency, timezone, opening cash/date                         | Single row `default`; BDT (৳) and calendar fixed for this release             |
 | User                                         | Name, email, role, active                                           | Unique email; role constraint; at least one active administrator              |
 | Session / Account / Verification / RateLimit | Better Auth identity and session data                               | Session/account user foreign keys; private; no public sign-up                 |
 | Employee                                     | Code, name, position, daily rate, active                            | Unique code; positive rate; deactivate rather than delete                     |
@@ -86,7 +86,7 @@ Reporting aggregates run in a repeatable-read transaction. PDF summary and detai
 
 Daily and monthly reports share the reporting service. The export dialog has daily/monthly selectors, a date/month picker, summary/detailed content, section toggles, A4 portrait/landscape, a preview, and a download button. Preview generation returns the same PDF blob that is downloaded. The PDF contains organization and currency, period, earnings/cost/net cards, a cash statement, selected detail tables, notes, confidentiality footer, and page numbers. Tables can continue across pages without splitting rows.
 
-The PDF generator is server-side and uses built-in fonts. It does not depend on a browser print dialog, remote font downloads, or headless Chromium in production. A detailed section is limited to 2,000 rows; larger exports must use a daily report or summary-only mode. Paginated application tables show 20 records per page; numeric summaries aggregate the full period, not only the visible page. Text and tables in this release use Latin font coverage; a Unicode embedded font should be added for other scripts.
+The PDF generator is server-side and uses built-in fonts. It does not depend on a browser print dialog, remote font downloads, or headless Chromium in production. A detailed section is limited to 2,000 rows; larger exports must use a daily report or summary-only mode. Application tables support 10, 20, or 50 records per page, validated server-side sorting across the full matching dataset, comfortable/compact density, sticky desktop headers/actions, and mobile record cards. Table-only requests omit unchanged report aggregates and selector data; refreshes and mutations reload the complete period summary. Numeric summaries aggregate the full period, not only the visible page. PDF text uses built-in Latin fonts with an embedded Noto Sans Bengali font for the taka currency glyph. Other non-Latin text still needs additional font coverage.
 
 ## Deployment and migrations
 
@@ -110,3 +110,7 @@ Vercel's Git integration previously lacked repository access; direct source uplo
 - Enable and test Neon point-in-time restore/branch recovery according to the project's plan. Backup retention is not configured by this application. Rehearse restore into a separate branch before relying on it, and verify financial totals and access controls after recovery.
 - Admins and database operators are trusted. Application audit logs are append-only through the app but are not tamper-proof against a database owner. Use external immutable audit storage for stricter requirements.
 - Next extensions: partial payment ledger, approval workflow, monthly close/snapshots, bulk imports, worker-level permissions, multi-business tenancy, jobs for very large PDFs, email verification/recovery, MFA, and system monitoring. Tenant scoping must be introduced on every model/query before offering multiple businesses in one database.
+
+## Taka currency update
+
+The requested currency display is Bangladeshi taka (BDT, ৳). Migration `202611200003_bdt_currency` updates the workspace label/default; it does not convert or modify stored monetary values. Forms, axes, settings and PDF reports use the same currency convention. The report function traces the bundled OFL-licensed font needed for the taka glyph.

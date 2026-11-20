@@ -80,7 +80,7 @@ export async function mutateRecord(
     )
       throw new HttpError(
         400,
-        "The calculated total must be between $0.01 and $999,999,999,999.99.",
+        "The calculated total must be between ৳0.01 and ৳999,999,999,999.99.",
       );
     if (data.date instanceof Date && data.date < workspace.openingDate)
       throw new HttpError(

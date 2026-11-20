@@ -20,9 +20,8 @@ import {
   ChartNoAxesCombined,
   Check,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
+  Banknote,
   ClipboardList,
   Code2,
   Coins,
@@ -30,17 +29,14 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  MoreHorizontal,
   Package,
   PanelLeftClose,
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Settings2,
   ShieldCheck,
   SunMoon,
-  Trash2,
   Users,
   Wallet,
   X,
@@ -48,8 +44,10 @@ import {
 import type { Kind } from "@/lib/permissions";
 import { canExport, canWrite } from "@/lib/permissions";
 import { formatMoney } from "@/lib/finance";
-import { categories, today } from "@/lib/validation";
+import { today } from "@/lib/validation";
 import type { RecordRow, User, WorkspaceData } from "@/lib/client-types";
+import { RecordsTable } from "./records-table";
+import type { SortKey, SortDirection } from "@/lib/table-options";
 import { RecordForm } from "./record-form";
 import { ExportDialog } from "./export-dialog";
 const authClient = createAuthClient();
@@ -147,6 +145,13 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
   const [status, setStatus] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sort, setSort] = useState<SortKey>(
+    m.kind === "employee" ? "label" : "date",
+  );
+  const [direction, setDirection] = useState<SortDirection>(
+    m.kind === "employee" ? "asc" : "desc",
+  );
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -160,6 +165,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
   const [userForm, setUserForm] = useState<User | null | undefined>(undefined);
   const [activity, setActivity] = useState(false);
   const requestRef = useRef(0);
+  const summaryRef = useRef("");
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 4000);
@@ -173,7 +179,9 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
         setLoading(true);
         setError("");
         try {
+          const summaryKey = `${period}/${month}/${day}`;
           const q = new URLSearchParams({
+            summary: summaryRef.current === summaryKey ? "0" : "1",
             month,
             day,
             period,
@@ -182,6 +190,9 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
             status,
             category,
             page: String(page),
+            pageSize: String(pageSize),
+            sort,
+            direction,
           });
           const r = await fetch(`/api/workspace?${q}`, {
             signal: ctrl.signal,
@@ -193,7 +204,10 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
             return;
           }
           if (!r.ok) throw new Error(d.error);
-          if (n === requestRef.current) setData(d);
+          if (n === requestRef.current) {
+            setData((previous) => ({ ...previous, ...d }));
+            if (d.totals) summaryRef.current = summaryKey;
+          }
           if (section === "team") {
             const t = await fetch("/api/team", { signal: ctrl.signal });
             if (t.ok) setTeam(await t.json());
@@ -220,11 +234,17 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
     status,
     category,
     page,
+    pageSize,
+    sort,
+    direction,
     revision,
     router,
     section,
   ]);
-  const refresh = () => setRevision((v) => v + 1);
+  const refresh = () => {
+    summaryRef.current = "";
+    setRevision((v) => v + 1);
+  };
   function saved() {
     setForm(null);
     setUserForm(undefined);
@@ -455,7 +475,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
           </div>
           <div className="topbar-actions">
             <span className="workspace-pill">
-              <span className="live-dot" /> USD workspace
+              <span className="live-dot" /> BDT workspace
             </span>
             <button
               className="icon-btn"
@@ -581,7 +601,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
               </label>
               <span className="toolbar-note">
                 {data?.period.label || "Loading period…"}{" "}
-                <span>· All amounts in USD</span>
+                <span>· All amounts in BDT</span>
               </span>
               <button
                 className="icon-btn"
@@ -634,7 +654,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                             [
                               "Closing cash",
                               t?.closingCash,
-                              CircleDollarSign,
+                              Banknote,
                               "Opening + received − paid",
                             ],
                           ]
@@ -755,7 +775,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                                 />
                                 <YAxis
                                   tickFormatter={(v) =>
-                                    `$${v >= 1000 ? `${v / 1000}k` : v}`
+                                    `৳${v >= 1000 ? `${v / 1000}k` : v}`
                                   }
                                   axisLine={false}
                                   tickLine={false}
@@ -909,245 +929,56 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                           {data.count} {data.count === 1 ? "record" : "records"}
                         </span>
                       </div>
-                      <div className="table-toolbar">
-                        <div className="search-input">
-                          <Search size={16} />
-                          <input
-                            aria-label="Search records"
-                            placeholder={
-                              m.kind === "salary"
-                                ? "Search employee…"
-                                : "Search records…"
-                            }
-                            value={search}
-                            onChange={(e) => {
-                              setSearch(e.target.value);
-                              setPage(1);
-                            }}
-                          />
-                        </div>
-                        <div className="table-filters">
-                          {["production", "expense", "salary"].includes(
-                            m.kind,
-                          ) && (
-                            <select
-                              aria-label="Payment status"
-                              value={status}
-                              onChange={(e) => {
-                                setStatus(e.target.value);
-                                setPage(1);
-                              }}
-                            >
-                              <option value="">All statuses</option>
-                              <option value="paid">Paid</option>
-                              <option value="pending">Pending</option>
-                            </select>
-                          )}
-                          {m.kind === "expense" && (
-                            <select
-                              aria-label="Expense category"
-                              value={category}
-                              onChange={(e) => {
-                                setCategory(e.target.value);
-                                setPage(1);
-                              }}
-                            >
-                              <option value="">All categories</option>
-                              {categories.map((c) => (
-                                <option key={c}>{c}</option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                      <div className="table-scroll">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>
-                                {m.kind === "employee" ? "EMPLOYEE" : "DATE"}
-                              </th>
-                              <th>
-                                {m.kind === "salary"
-                                  ? "EMPLOYEE"
-                                  : m.kind === "employee"
-                                    ? "POSITION"
-                                    : "DESCRIPTION"}
-                              </th>
-                              <th>
-                                {m.kind === "production"
-                                  ? "QUANTITY"
-                                  : m.kind === "salary"
-                                    ? "DAYS × RATE"
-                                    : m.kind === "employee"
-                                      ? "CODE"
-                                      : m.kind === "cashEntry"
-                                        ? "SOURCE"
-                                        : "CATEGORY"}
-                              </th>
-                              <th className="align-right">
-                                {m.kind === "employee"
-                                  ? "DAILY RATE"
-                                  : "AMOUNT"}
-                              </th>
-                              <th>STATUS</th>
-                              <th>
-                                <span className="sr-only">Actions</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {data.rows.map((row) => (
-                              <tr key={`${row.source || ""}${row.id}`}>
-                                <td>
-                                  {m.kind === "employee" ? (
-                                    <span className="employee-name">
-                                      <span className="avatar small-avatar">
-                                        {row.name?.slice(0, 2).toUpperCase()}
-                                      </span>
-                                      {row.name}
-                                    </span>
-                                  ) : (
-                                    row.date?.slice(0, 10)
-                                  )}
-                                </td>
-                                <td className="row-title">
-                                  {m.kind === "salary"
-                                    ? row.employee?.name
-                                    : m.kind === "employee"
-                                      ? row.position
-                                      : row.description}
-                                </td>
-                                <td>
-                                  {m.kind === "production"
-                                    ? `${row.quantity} ${row.unit}`
-                                    : m.kind === "salary"
-                                      ? `${row.daysWorked} × ${formatMoney(row.dailyRate || "0")}`
-                                      : m.kind === "employee"
-                                        ? row.code
-                                        : row.source || row.category}
-                                </td>
-                                <td
-                                  className={`align-right amount ${row.direction === "IN" ? "positive" : ""}`}
-                                >
-                                  {row.direction === "IN"
-                                    ? "+"
-                                    : row.direction === "OUT"
-                                      ? "−"
-                                      : ""}
-                                  {formatMoney(
-                                    m.kind === "employee"
-                                      ? row.dailyRate || "0"
-                                      : row.amount || "0",
-                                  )}
-                                </td>
-                                <td>
-                                  <span
-                                    className={`status-badge ${(m.kind === "employee" ? row.active : m.kind === "cashEntry" || row.paidOn) ? "paid" : "pending"}`}
-                                  >
-                                    <span />
-                                    {m.kind === "employee"
-                                      ? row.active
-                                        ? "Active"
-                                        : "Inactive"
-                                      : m.kind === "cashEntry"
-                                        ? row.direction === "IN"
-                                          ? "Received"
-                                          : "Paid"
-                                        : row.paidOn
-                                          ? "Paid"
-                                          : "Pending"}
-                                  </span>
-                                </td>
-                                <td>
-                                  {write &&
-                                  (m.kind !== "cashEntry" ||
-                                    row.source === "cashEntry") ? (
-                                    <details className="row-menu">
-                                      <summary
-                                        className="icon-btn"
-                                        aria-label="Record actions"
-                                      >
-                                        <MoreHorizontal size={18} />
-                                      </summary>
-                                      <div className="dropdown">
-                                        <button
-                                          onClick={() => setForm({ row })}
-                                        >
-                                          <Pencil size={14} />
-                                          Edit entry
-                                        </button>
-                                        {m.kind !== "employee" && (
-                                          <button
-                                            className="danger"
-                                            onClick={() => setVoiding(row)}
-                                          >
-                                            <Trash2 size={14} />
-                                            Void entry
-                                          </button>
-                                        )}
-                                      </div>
-                                    </details>
-                                  ) : (
-                                    <span className="muted">—</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {!data.rows.length && (
-                        <div className="empty-state">
-                          <span className="empty-icon">
-                            <ClipboardList size={25} />
-                          </span>
-                          <h3>
-                            {search || status || category
-                              ? "No matching records"
-                              : "A fresh page for your business"}
-                          </h3>
-                          <p>
-                            {search || status || category
-                              ? "Try adjusting the search or filters."
-                              : `No ${m.label} entries for this period. Add one to get started.`}
-                          </p>
-                          {write && !search && !status && !category && (
-                            <button
-                              className="btn primary"
-                              onClick={() => setForm({})}
-                            >
-                              <Plus size={16} />
-                              Add {m.label}
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      <div className="pagination">
-                        <span>
-                          Showing {data.count ? (page - 1) * 20 + 1 : 0}–
-                          {Math.min(page * 20, data.count)} of {data.count}
-                        </span>
-                        <div>
-                          <button
-                            className="icon-btn"
-                            aria-label="Previous page"
-                            disabled={page <= 1 || loading}
-                            onClick={() => setPage(page - 1)}
-                          >
-                            <ChevronLeft size={17} />
-                          </button>
-                          <span>Page {page}</span>
-                          <button
-                            className="icon-btn"
-                            aria-label="Next page"
-                            disabled={page * 20 >= data.count || loading}
-                            onClick={() => setPage(page + 1)}
-                          >
-                            <ChevronRight size={17} />
-                          </button>
-                        </div>
-                      </div>
+                      <RecordsTable
+                        kind={m.kind}
+                        label={m.label}
+                        data={data}
+                        loading={loading}
+                        write={write}
+                        search={search}
+                        status={status}
+                        category={category}
+                        page={page}
+                        pageSize={pageSize}
+                        sort={sort}
+                        direction={direction}
+                        onSearch={(value) => {
+                          setSearch(value);
+                          setPage(1);
+                        }}
+                        onStatus={(value) => {
+                          setStatus(value);
+                          setPage(1);
+                        }}
+                        onCategory={(value) => {
+                          setCategory(value);
+                          setPage(1);
+                        }}
+                        onPage={setPage}
+                        onPageSize={(value) => {
+                          setPageSize(value);
+                          setPage(1);
+                        }}
+                        onSort={(key, targetDirection) => {
+                          setSort(key);
+                          setDirection(
+                            targetDirection ||
+                              (sort === key && direction === "asc"
+                                ? "desc"
+                                : "asc"),
+                          );
+                          setPage(1);
+                        }}
+                        onClear={() => {
+                          setSearch("");
+                          setStatus("");
+                          setCategory("");
+                          setPage(1);
+                        }}
+                        onAdd={() => setForm({})}
+                        onEdit={(row) => setForm({ row })}
+                        onVoid={setVoiding}
+                      />
                     </section>
                     <div className="dashboard-footnote">
                       <ShieldCheck size={14} />
@@ -1419,7 +1250,7 @@ function SettingsPanel({
           />
         </label>
         <label>
-          Opening cash balance ($)
+          Opening cash balance (৳)
           <input
             name="openingCash"
             type="number"
@@ -1435,7 +1266,7 @@ function SettingsPanel({
         <div className="form-grid">
           <label>
             Currency
-            <input value="USD — US Dollar" readOnly />
+            <input value="BDT — Bangladeshi Taka (৳)" readOnly />
           </label>
           <label>
             Business timezone
