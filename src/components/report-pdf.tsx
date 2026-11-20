@@ -29,89 +29,80 @@ function CurrencyText({ value, style }: { value: string; style?: Style }) {
   );
 }
 export type PdfData = Awaited<ReturnType<typeof report>>;
-export type PdfRow = {
-  date: string;
-  label: string;
-  detail: string;
-  amount: string;
-  status: string;
+export type PdfSection = {
+  kind: string;
+  title: string;
+  amountLabel: string;
+  rows: { date: string; dailyProduction?: string; amount: string }[];
 };
-export type PdfSection = { title: string; rows: PdfRow[] };
 const s = StyleSheet.create({
   page: {
     padding: 38,
     fontFamily: "Helvetica",
-    fontSize: 9,
+    fontSize: 10,
     color: "#23333b",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fff",
   },
   header: {
     borderBottomWidth: 2,
-    borderColor: "#0e9f79",
-    paddingBottom: 18,
+    borderColor: "#119c79",
+    paddingBottom: 20,
     marginBottom: 22,
   },
-  brand: { fontSize: 25, fontFamily: "Helvetica-Bold", color: "#0e9f79" },
-  workspace: { fontSize: 9, color: "#71818a", marginTop: 5 },
-  title: { fontSize: 22, fontFamily: "Helvetica-Bold", marginTop: 22 },
-  subtitle: { color: "#71818a", marginTop: 7 },
-  metrics: { display: "flex", flexDirection: "row", gap: 10, marginBottom: 18 },
-  metric: { flex: 1, padding: 13, backgroundColor: "#f0f7f4", borderRadius: 6 },
-  label: { fontSize: 8, color: "#60776c", marginBottom: 8 },
+  brand: { fontSize: 27, fontFamily: "Helvetica-Bold", color: "#119c79" },
+  muted: { fontSize: 9, color: "#71818a", marginTop: 7 },
+  title: { fontSize: 22, fontFamily: "Helvetica-Bold", marginTop: 20 },
+  metrics: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  metric: { flex: 1, padding: 14, backgroundColor: "#f0f7f4", borderRadius: 6 },
+  label: { fontSize: 8, color: "#60776c", marginBottom: 9 },
   value: { fontSize: 16, fontFamily: "Helvetica-Bold" },
   section: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
     marginTop: 18,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  cash: {
-    display: "flex",
+  summary: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 7,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: "#edf0f2",
   },
   thead: {
-    display: "flex",
     flexDirection: "row",
     backgroundColor: "#edf3f1",
-    padding: 8,
-    fontSize: 8,
+    padding: 9,
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
   },
-  tr: {
-    display: "flex",
+  row: {
     flexDirection: "row",
-    padding: 8,
+    padding: 10,
     borderBottomWidth: 1,
     borderColor: "#edf0f2",
   },
-  date: { width: "16%" },
-  description: { width: "37%", paddingRight: 8 },
-  detail: { width: "18%", paddingRight: 6 },
-  status: { width: "13%", fontSize: 8 },
-  amount: { width: "16%", textAlign: "right" },
-  empty: { padding: 14, color: "#71818a" },
+  date: { flex: 1 },
+  production: { flex: 1, textAlign: "center" },
+  amount: { flex: 1, textAlign: "right" },
+  empty: { padding: 14, fontSize: 9, color: "#71818a" },
+  note: {
+    fontSize: 9,
+    color: "#667580",
+    lineHeight: 1.6,
+    backgroundColor: "#f7f9fa",
+    padding: 13,
+    marginTop: 24,
+  },
   footer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 21,
     left: 38,
     right: 38,
-    display: "flex",
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 8,
     color: "#71818a",
-  },
-  note: {
-    marginTop: 18,
-    padding: 12,
-    backgroundColor: "#f7f9fa",
-    fontSize: 8,
-    lineHeight: 1.6,
-    color: "#667580",
   },
 });
 export function ReportPdf({
@@ -132,89 +123,78 @@ export function ReportPdf({
       <Page size="A4" orientation={orientation} style={s.page}>
         <View style={s.header}>
           <Text style={s.brand}>earn.</Text>
-          <Text style={s.workspace}>
+          <Text style={s.muted}>
             {data.workspace.name} · BDT · {data.workspace.timezone}
           </Text>
           <Text style={s.title}>
             {data.period.mode === "daily" ? "Daily report" : "Monthly summary"}
           </Text>
-          <Text style={s.subtitle}>
+          <Text style={s.muted}>
             {data.period.label} · {data.period.start} to {data.period.end}
           </Text>
         </View>
         <View style={s.metrics}>
           {[
-            ["PRODUCTION EARNINGS", t.revenue],
-            ["TOTAL COSTS", t.costs],
-            ["NET EARNINGS", t.net],
+            ["TOTAL EARN", t.totalEarn],
+            ["TOTAL COSTS", t.totalCost],
+            ["NET BALANCE", t.netBalance],
           ].map(([label, value]) => (
-            <View key={label} style={s.metric}>
+            <View style={s.metric} key={label}>
               <Text style={s.label}>{label}</Text>
               <CurrencyText style={s.value} value={formatMoney(value)} />
             </View>
           ))}
         </View>
-        <Text style={s.section}>Earnings & expenses</Text>
+        <Text style={s.section}>Simple daily totals</Text>
         {[
-          ["Production earnings", t.revenue],
-          ["Operating expenses", t.expenses],
-          ["Daily salaries", t.salaries],
-          ["Net earnings", t.net],
+          ["Total Earn", t.totalEarn],
+          ["Net Salary", t.netSalary],
+          ["Cash Flow Expenses", t.netAmount],
+          ["Net Balance", t.netBalance],
         ].map(([label, value]) => (
-          <View key={label} style={s.cash}>
-            <Text>{label}</Text>
-            <CurrencyText value={formatMoney(value)} />
-          </View>
-        ))}
-        <Text style={s.section}>Cash flow</Text>
-        {[
-          ["Opening cash", t.openingCash],
-          ["Cash received", t.cashIn],
-          ["Cash paid", t.cashOut],
-          ["Closing cash", t.closingCash],
-        ].map(([label, value]) => (
-          <View key={label} style={s.cash}>
+          <View key={label} style={s.summary}>
             <Text>{label}</Text>
             <CurrencyText value={formatMoney(value)} />
           </View>
         ))}
         {sections.map((section) => (
-          <View key={section.title}>
-            <Text style={s.section}>{section.title}</Text>
-            <View style={s.thead}>
-              <Text style={s.date}>DATE</Text>
-              <Text style={s.description}>DESCRIPTION</Text>
-              <Text style={s.detail}>DETAIL</Text>
-              <Text style={s.status}>STATUS</Text>
-              <Text style={s.amount}>AMOUNT</Text>
+          <View key={section.kind}>
+            <View wrap={false} minPresenceAhead={36}>
+              <Text style={s.section}>{section.title}</Text>
+              <View style={s.thead}>
+                <Text style={s.date}>Date</Text>
+                {section.kind === "production" && (
+                  <Text style={s.production}>Daily Production</Text>
+                )}
+                <Text style={s.amount}>{section.amountLabel}</Text>
+              </View>
             </View>
             {section.rows.length ? (
-              section.rows.map((r, i) => (
-                <View key={i} style={s.tr} wrap={false}>
-                  <Text style={s.date}>{r.date}</Text>
-                  <Text style={s.description}>{r.label}</Text>
-                  <CurrencyText style={s.detail} value={r.detail} />
-                  <Text style={s.status}>{r.status}</Text>
+              section.rows.map((row, i) => (
+                <View style={s.row} key={i} wrap={false}>
+                  <Text style={s.date}>{row.date}</Text>
+                  {section.kind === "production" && (
+                    <Text style={s.production}>{row.dailyProduction}</Text>
+                  )}
                   <CurrencyText
                     style={s.amount}
-                    value={formatMoney(r.amount)}
+                    value={formatMoney(row.amount)}
                   />
                 </View>
               ))
             ) : (
-              <Text style={s.empty}>No records for this period.</Text>
+              <Text style={s.empty}>No daily records for this period.</Text>
             )}
           </View>
         ))}
         <Text style={s.note}>
-          Net earnings = production earnings - operating expenses - salaries.
-          Cash flow uses payment dates and includes owner contributions and
-          withdrawals. Unpaid records affect earnings and expenses but do not
-          affect cash. Salary = daily rate × days worked. Amounts are rounded to
-          two decimal places per record.
+          Net Balance = Total Earn - Net Salary - Cash Flow Expenses. Each
+          section stores one daily total per date. Cash flow Net Amount is
+          expense-only: money paid out. Monthly summaries add up the daily
+          records. All amounts are in Bangladeshi taka.
         </Text>
         <View style={s.footer} fixed>
-          <Text>{data.workspace.name} · Confidential financial report</Text>
+          <Text>{data.workspace.name} · Confidential report</Text>
           <Text
             render={({ pageNumber, totalPages }) =>
               `${pageNumber} / ${totalPages}`

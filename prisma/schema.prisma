@@ -84,7 +84,6 @@ model Workspace {
   name        String   @default("Earn Workspace")
   currency    String   @default("BDT")
   timezone    String   @default("Asia/Dhaka")
-  openingCash Decimal  @default(0) @db.Decimal(14, 2)
   openingDate DateTime @db.Date
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -92,90 +91,42 @@ model Workspace {
   @@map("earn_workspace")
 }
 
-model Employee {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  position  String
-  dailyRate Decimal  @db.Decimal(14, 2)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  salaries  Salary[]
-
-  @@map("earn_employees")
-}
-
+// Only three business records. Amounts are daily totals entered directly.
 model Production {
-  id          String    @id @default(cuid())
-  date        DateTime  @db.Date
-  description String
-  quantity    Decimal   @db.Decimal(14, 3)
-  unit        String    @default("pieces")
-  unitRate    Decimal   @db.Decimal(14, 2)
-  amount      Decimal   @db.Decimal(14, 2)
-  paidOn      DateTime? @db.Date
-  notes       String    @default("")
-  createdBy   String
-  voidedAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  date            DateTime  @db.Date
+  dailyProduction Decimal   @map("quantity") @db.Decimal(14, 3)
+  totalEarn       Decimal   @map("amount") @db.Decimal(14, 2)
+  createdBy       String
+  voidedAt        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@index([date, voidedAt])
-  @@index([paidOn])
   @@map("earn_production")
 }
 
-model Expense {
-  id          String    @id @default(cuid())
-  date        DateTime  @db.Date
-  description String
-  category    String
-  amount      Decimal   @db.Decimal(14, 2)
-  paidOn      DateTime? @db.Date
-  notes       String    @default("")
-  createdBy   String
-  voidedAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([date, voidedAt])
-  @@index([paidOn])
-  @@map("earn_expenses")
-}
-
 model Salary {
-  id         String    @id @default(cuid())
-  date       DateTime  @db.Date
-  employeeId String
-  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Restrict)
-  daysWorked Decimal   @db.Decimal(3, 2)
-  dailyRate  Decimal   @db.Decimal(14, 2)
-  amount     Decimal   @db.Decimal(14, 2)
-  paidOn     DateTime? @db.Date
-  notes      String    @default("")
-  createdBy  String
-  voidedAt   DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  date      DateTime  @db.Date
+  netSalary Decimal   @map("amount") @db.Decimal(14, 2)
+  createdBy String
+  voidedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([date, voidedAt])
-  @@index([employeeId, date])
-  @@index([paidOn])
   @@map("earn_salaries")
 }
 
-model CashEntry {
-  id          String    @id @default(cuid())
-  date        DateTime  @db.Date
-  description String
-  direction   String
-  amount      Decimal   @db.Decimal(14, 2)
-  notes       String    @default("")
-  createdBy   String
-  voidedAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model Cashflow {
+  id        String    @id @default(cuid())
+  date      DateTime  @db.Date
+  netAmount Decimal   @map("amount") @db.Decimal(14, 2)
+  createdBy String
+  voidedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([date, voidedAt])
   @@map("earn_cash_entries")

@@ -28,9 +28,8 @@ export function ExportDialog({
   const [orientation, setOrientation] = useState("portrait");
   const [sections, setSections] = useState([
     "production",
-    "expense",
     "salary",
-    "cash",
+    "cashflow",
   ]);
   const [url, setUrl] = useState("");
   const [pending, setPending] = useState(false);
@@ -160,10 +159,9 @@ export function ExportDialog({
               <fieldset>
                 <legend>Include sections</legend>
                 {[
-                  ["production", "Production earnings"],
-                  ["expense", "Operating expenses"],
-                  ["salary", "Daily salaries"],
-                  ["cash", "Cash activity"],
+                  ["production", "Total Earn"],
+                  ["salary", "Salary"],
+                  ["cashflow", "Cash flow expenses"],
                 ].map(([key, label]) => (
                   <label className="checkbox-label" key={key}>
                     <input
@@ -184,8 +182,8 @@ export function ExportDialog({
               </fieldset>
             )}
             <p className="field-help">
-              Generated from live records. Earnings use entry dates; cash flow
-              uses payment dates.
+              Generated from your daily totals. Cash flow records are expenses
+              only.
             </p>
             {error && (
               <p className="notice error" role="alert">
@@ -229,24 +227,24 @@ export function ExportDialog({
                 <p>{mode === "daily" ? date : selectedMonth}</p>
                 <div className="preview-metrics">
                   <span>
-                    Production earnings
+                    Total Earn
                     <strong>
                       {mode === data.period.mode &&
                       (mode === "daily"
                         ? date === day
                         : selectedMonth === month)
-                        ? formatMoney(data.totals.revenue)
+                        ? formatMoney(data.totals.totalEarn)
                         : "—"}
                     </strong>
                   </span>
                   <span>
-                    Net earnings
+                    Net Balance
                     <strong>
                       {mode === data.period.mode &&
                       (mode === "daily"
                         ? date === day
                         : selectedMonth === month)
-                        ? formatMoney(data.totals.net)
+                        ? formatMoney(data.totals.netBalance)
                         : "—"}
                     </strong>
                   </span>

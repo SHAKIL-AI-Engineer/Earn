@@ -7,14 +7,14 @@ export default async function Page({
   params: Promise<{ slug: string[] }>;
 }) {
   const section = (await params).slug.join("/");
+  if (section === "expenses") redirect("/cashflow");
+  if (section === "employees") redirect("/salaries");
   if (
     ![
       "dashboard",
       "production",
       "salaries",
-      "expenses",
       "cashflow",
-      "employees",
       "reports/daily",
       "reports/monthly",
       "team",

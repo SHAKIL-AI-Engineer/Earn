@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
-import { cashBalance, D, statement } from "./finance";
+import { D, statement } from "./finance";
 import { date, dateText, today } from "./validation";
 import { HttpError } from "./http";
 export function periodFrom(params: URLSearchParams) {
@@ -13,8 +13,8 @@ export function periodFrom(params: URLSearchParams) {
     month > "2100-12"
   )
     throw new HttpError(400, "Invalid month.");
-  const start = mode === "daily" ? date(day) : date(month + "-01");
-  const end = new Date(start);
+  const start = date(mode === "daily" ? day : month + "-01"),
+    end = new Date(start);
   if (mode === "daily") end.setUTCDate(end.getUTCDate() + 1);
   else end.setUTCMonth(end.getUTCMonth() + 1);
   return {
@@ -37,141 +37,47 @@ export async function report(
   period: ReturnType<typeof periodFrom>,
   client?: Prisma.TransactionClient,
 ) {
-  const { start, end } = period;
-  const range = { gte: start, lt: end };
-  const alive = { voidedAt: null };
+  const where = { voidedAt: null, date: { gte: period.start, lt: period.end } };
   const run = async (tx: Prisma.TransactionClient) => {
-    const workspace = await tx.workspace.findUniqueOrThrow({
-      where: { id: "default" },
-    });
-    const sum = (v: { _sum: { amount: Prisma.Decimal | null } }) =>
-      D(v._sum.amount || 0);
     const [
-      rev,
-      exp,
-      sal,
-      received,
-      paidExp,
-      paidSal,
-      otherIn,
-      otherOut,
-      priorRev,
-      priorExp,
-      priorSal,
-      priorIn,
-      priorOut,
-      productionTrend,
-      expenseTrend,
-      salaryTrend,
-      breakdown,
-      employeeCount,
-      unpaidProduction,
-      unpaidExpense,
-      unpaidSalary,
+      workspace,
+      production,
+      salary,
+      cashflow,
+      productionDays,
+      salaryDays,
+      cashDays,
     ] = await Promise.all([
+      tx.workspace.findUniqueOrThrow({ where: { id: "default" } }),
       tx.production.aggregate({
-        where: { ...alive, date: range },
-        _sum: { amount: true },
+        where,
+        _sum: { totalEarn: true, dailyProduction: true },
+        _count: true,
       }),
-      tx.expense.aggregate({
-        where: { ...alive, date: range },
-        _sum: { amount: true },
-      }),
-      tx.salary.aggregate({
-        where: { ...alive, date: range },
-        _sum: { amount: true },
-      }),
-      tx.production.aggregate({
-        where: { ...alive, paidOn: range },
-        _sum: { amount: true },
-      }),
-      tx.expense.aggregate({
-        where: { ...alive, paidOn: range },
-        _sum: { amount: true },
-      }),
-      tx.salary.aggregate({
-        where: { ...alive, paidOn: range },
-        _sum: { amount: true },
-      }),
-      tx.cashEntry.aggregate({
-        where: { ...alive, date: range, direction: "IN" },
-        _sum: { amount: true },
-      }),
-      tx.cashEntry.aggregate({
-        where: { ...alive, date: range, direction: "OUT" },
-        _sum: { amount: true },
-      }),
-      tx.production.aggregate({
-        where: { ...alive, paidOn: { lt: start } },
-        _sum: { amount: true },
-      }),
-      tx.expense.aggregate({
-        where: { ...alive, paidOn: { lt: start } },
-        _sum: { amount: true },
-      }),
-      tx.salary.aggregate({
-        where: { ...alive, paidOn: { lt: start } },
-        _sum: { amount: true },
-      }),
-      tx.cashEntry.aggregate({
-        where: { ...alive, date: { lt: start }, direction: "IN" },
-        _sum: { amount: true },
-      }),
-      tx.cashEntry.aggregate({
-        where: { ...alive, date: { lt: start }, direction: "OUT" },
-        _sum: { amount: true },
-      }),
-      tx.production.groupBy({
-        by: ["date"],
-        where: { ...alive, date: range },
-        _sum: { amount: true, quantity: true },
-      }),
-      tx.expense.groupBy({
-        by: ["date"],
-        where: { ...alive, date: range },
-        _sum: { amount: true },
-      }),
-      tx.salary.groupBy({
-        by: ["date"],
-        where: { ...alive, date: range },
-        _sum: { amount: true },
-      }),
-      tx.expense.groupBy({
-        by: ["category"],
-        where: { ...alive, date: range },
-        _sum: { amount: true },
-      }),
-      tx.employee.count({ where: { active: true } }),
-      tx.production.aggregate({
-        where: { ...alive, date: range, paidOn: null },
-        _sum: { amount: true },
-      }),
-      tx.expense.aggregate({
-        where: { ...alive, date: range, paidOn: null },
-        _sum: { amount: true },
-      }),
-      tx.salary.aggregate({
-        where: { ...alive, date: range, paidOn: null },
-        _sum: { amount: true },
-      }),
+      tx.salary.aggregate({ where, _sum: { netSalary: true }, _count: true }),
+      tx.cashflow.aggregate({ where, _sum: { netAmount: true }, _count: true }),
+      tx.production.groupBy({ by: ["date"], where, _sum: { totalEarn: true } }),
+      tx.salary.groupBy({ by: ["date"], where, _sum: { netSalary: true } }),
+      tx.cashflow.groupBy({ by: ["date"], where, _sum: { netAmount: true } }),
     ]);
-    const opening = cashBalance(
-      workspace.openingDate < end ? workspace.openingCash : 0,
-      sum(priorRev).plus(sum(priorIn)),
-      sum(priorExp).plus(sum(priorSal)).plus(sum(priorOut)),
-    );
-    const inflow = sum(received).plus(sum(otherIn));
-    const outflow = sum(paidExp).plus(sum(paidSal)).plus(sum(otherOut));
+    const earn = D(production._sum.totalEarn || 0),
+      pay = D(salary._sum.netSalary || 0),
+      expense = D(cashflow._sum.netAmount || 0);
     const trend = [];
-    for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
-      const find = (
-        list: typeof productionTrend | typeof expenseTrend | typeof salaryTrend,
-      ) =>
-        D(list.find((r) => r.date.getTime() === d.getTime())?._sum.amount || 0);
+    for (
+      let d = new Date(period.start);
+      d < period.end;
+      d.setUTCDate(d.getUTCDate() + 1)
+    ) {
+      const match = (date: Date) => date.getTime() === d.getTime();
       trend.push({
         day: d.toISOString().slice(0, 10),
-        revenue: find(productionTrend).toFixed(2),
-        costs: find(expenseTrend).plus(find(salaryTrend)).toFixed(2),
+        revenue: D(
+          productionDays.find((r) => match(r.date))?._sum.totalEarn || 0,
+        ).toFixed(2),
+        costs: D(salaryDays.find((r) => match(r.date))?._sum.netSalary || 0)
+          .plus(cashDays.find((r) => match(r.date))?._sum.netAmount || 0)
+          .toFixed(2),
       });
     }
     return {
@@ -179,34 +85,25 @@ export async function report(
       period: {
         mode: period.mode,
         label: period.label,
-        start: start.toISOString().slice(0, 10),
-        end: new Date(end.getTime() - 86400000).toISOString().slice(0, 10),
+        start: period.start.toISOString().slice(0, 10),
+        end: new Date(period.end.getTime() - 86400000)
+          .toISOString()
+          .slice(0, 10),
       },
       totals: {
-        ...statement(sum(rev), sum(exp), sum(sal)),
-        openingCash: opening,
-        cashIn: inflow.toFixed(2),
-        cashOut: outflow.toFixed(2),
-        closingCash: cashBalance(opening, inflow, outflow),
-        cashNet: inflow.minus(outflow).toFixed(2),
-        receivable: sum(unpaidProduction).toFixed(2),
-        payable: sum(unpaidExpense).plus(sum(unpaidSalary)).toFixed(2),
-        units: productionTrend
-          .reduce((s, r) => s.plus(r._sum.quantity || 0), D())
-          .toString(),
-        activeEmployees: employeeCount,
+        ...statement(earn, pay, expense),
+        dailyProduction: D(production._sum.dailyProduction || 0).toString(),
+        productionDays: production._count,
+        salaryDays: salary._count,
+        cashflowDays: cashflow._count,
       },
       trend,
-      breakdown: breakdown.map((b) => ({
-        category: b.category,
-        amount: D(b._sum.amount || 0).toFixed(2),
-      })),
     };
   };
   return client
     ? run(client)
     : db().$transaction(run, {
         isolationLevel: "RepeatableRead",
-        timeout: 30000,
+        timeout: 20000,
       });
 }

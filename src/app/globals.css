@@ -2610,3 +2610,140 @@ body {
     max-width: 145px !important;
   }
 }
+
+/* Three-field daily records. */
+.simple-trend {
+  margin-bottom: 23px;
+}
+.simple-footer-note {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 18px 0 5px;
+}
+.record-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 22px 18px;
+  flex-wrap: wrap;
+}
+.record-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 9px 13px;
+}
+.record-tabs button.selected {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border-color: #489b7d65;
+}
+.daily-date-filter {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.daily-date-filter input {
+  width: 155px;
+  height: 37px;
+  padding: 7px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+.table-spacer {
+  flex: 1;
+}
+.simple-table {
+  min-width: 450px;
+  table-layout: auto;
+}
+.simple-table th:first-child {
+  width: auto;
+}
+.simple-table th:nth-child(2),
+.simple-table th:nth-child(3) {
+  width: auto;
+}
+.simple-table th:last-child {
+  width: 100px;
+}
+.simple-table td {
+  font-size: 13px;
+}
+.simple-table .row-actions-cell {
+  width: 100px;
+}
+.simple-table .amount {
+  font-size: 14px;
+}
+.simple-table td:not(:first-child) {
+  text-align: right;
+}
+.simple-table th:not(:first-child) {
+  text-align: right;
+}
+.simple-table th:not(:first-child) .sort-button {
+  justify-content: flex-end;
+}
+.simple-records .table-toolbar {
+  padding-bottom: 16px;
+}
+@media (max-width: 760px) {
+  .record-tabs {
+    padding: 0 17px 16px;
+    gap: 7px;
+  }
+  .record-tabs button {
+    font-size: 10px;
+    padding: 9px 10px;
+  }
+  .simple-table {
+    min-width: 0;
+  }
+  .simple-table tr {
+    grid-template-columns: 1fr 1fr;
+    padding: 4px 14px;
+  }
+  .simple-table td:nth-child(2) {
+    grid-column: auto;
+    border: 0;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .simple-table td:not(:first-child) {
+    text-align: left;
+  }
+  .simple-table td.amount {
+    align-items: flex-end;
+    grid-column: 2;
+  }
+  .simple-table td.row-actions-cell {
+    grid-column: 1/-1;
+    align-items: flex-end;
+    width: auto;
+    border-top: 1px solid var(--line);
+    padding: 10px 0;
+  }
+  .simple-table .row-actions-cell::before {
+    display: none;
+  }
+  .simple-records .daily-date-filter {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .simple-records .mobile-sort {
+    margin-left: auto;
+    max-width: 160px !important;
+  }
+  .daily-date-filter input {
+    width: 180px;
+  }
+  .simple-records .table-spacer {
+    display: none;
+  }
+}

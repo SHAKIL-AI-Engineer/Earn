@@ -69,7 +69,7 @@ export function failure(error: unknown) {
       return json(
         {
           error:
-            "This record already exists. Check the employee/date, code, or email.",
+            "This date already has a daily total, or this email is already registered.",
         },
         409,
       );

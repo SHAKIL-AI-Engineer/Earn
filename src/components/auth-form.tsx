@@ -62,7 +62,7 @@ export function AuthForm({ setup = false }: { setup?: boolean }) {
             <span>Better decisions.</span>
           </h1>
           <p>
-            Your production, people, and cash flow.
+            Your production, salary, and daily expenses.
             <br />
             Together in one simple workspace.
           </p>
@@ -189,7 +189,7 @@ export function AuthForm({ setup = false }: { setup?: boolean }) {
           </button>
           <p className="small muted">
             {setup
-              ? "BDT · Daily-rate salaries · Asia/Dhaka reporting dates"
+              ? "BDT · Simple daily records · Asia/Dhaka reporting dates"
               : "Need an account or a password reset? Contact your workspace administrator."}
           </p>
         </form>

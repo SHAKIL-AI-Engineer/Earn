@@ -1,116 +1,63 @@
 {
   "version": 2,
-  "title": "Earn system architecture",
-  "description": "Deployed modular monolith and financial data flow",
+  "title": "Earn simple application architecture",
   "diagrams": [
     {
       "id": "system",
-      "title": "Application boundaries and report delivery",
+      "title": "Three daily records and reporting",
       "kind": "flowchart",
       "data": {
         "direction": "TB",
         "nodes": [
           {
             "id": "browser",
-            "label": "Browser dashboard and report preview"
+            "label": "Simple dashboard and daily forms"
           },
           {
             "id": "auth",
-            "label": "Better Auth session and current user"
+            "label": "Better Auth login and role checks"
           },
           {
-            "id": "api",
-            "label": "Next.js private API with role checks"
-          },
-          {
-            "id": "validation",
-            "label": "Zod validation and business rules"
-          },
-          {
-            "id": "services",
-            "label": "Production salary expense and cash services"
-          },
-          {
-            "id": "prisma",
-            "label": "Prisma ORM and transactions"
+            "id": "records",
+            "label": "Salary - Cashflow - Production"
           },
           {
             "id": "db",
-            "label": "Neon PostgreSQL with audit history"
+            "label": "Prisma ORM and Neon PostgreSQL"
           },
           {
-            "id": "reports",
-            "label": "Consistent reporting snapshot"
+            "id": "summary",
+            "label": "Daily and monthly totals"
           },
           {
             "id": "pdf",
-            "label": "Server PDF generator"
-          },
-          {
-            "id": "download",
-            "label": "Private PDF response"
+            "label": "Private PDF preview and download"
           }
         ],
         "edges": [
           {
             "from": "browser",
-            "to": "auth",
-            "label": "Sign in"
-          },
-          {
-            "from": "browser",
-            "to": "api",
-            "label": "Session cookie"
+            "to": "auth"
           },
           {
             "from": "auth",
-            "to": "api",
-            "label": "Verified identity"
+            "to": "records"
           },
           {
-            "from": "api",
-            "to": "validation",
-            "label": "Permission granted"
+            "from": "records",
+            "to": "db"
           },
           {
-            "from": "validation",
-            "to": "services",
-            "label": "Valid input"
+            "from": "db",
+            "to": "summary"
           },
           {
-            "from": "services",
-            "to": "prisma",
-            "label": "Atomic mutation and audit"
+            "from": "summary",
+            "to": "browser"
           },
           {
-            "from": "prisma",
-            "to": "db",
-            "label": "Encrypted connection"
-          },
-          {
-            "from": "api",
-            "to": "reports",
-            "label": "Authorized report request"
-          },
-          {
-            "from": "reports",
-            "to": "prisma",
-            "label": "Repeatable-read query"
-          },
-          {
-            "from": "reports",
-            "to": "pdf",
-            "label": "Server-calculated totals"
-          },
-          {
-            "from": "pdf",
-            "to": "download",
-            "label": "Stream PDF"
-          },
-          {
-            "from": "download",
-            "to": "browser",
-            "label": "Preview or download"
+            "from": "summary",
+            "to": "pdf"
           }
         ]
       }

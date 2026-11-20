@@ -18,7 +18,6 @@ export async function PATCH(request: Request) {
     const p = z
       .object({
         name: z.string().trim().min(1).max(80),
-        openingCash: z.string().regex(/^-?\d{1,10}(\.\d{1,2})?$/),
         updatedAt: z.string(),
       })
       .parse(await body(request));
@@ -32,7 +31,7 @@ export async function PATCH(request: Request) {
           throw new HttpError(409, "Settings changed. Refresh first.");
         const after = await tx.workspace.update({
           where: { id: "default" },
-          data: { name: p.name, openingCash: p.openingCash },
+          data: { name: p.name },
         });
         await audit(tx, user, "UPDATE", "workspace", "default", before, after);
         return after;

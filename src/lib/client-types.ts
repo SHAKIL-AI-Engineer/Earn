@@ -1,24 +1,10 @@
 export type RecordRow = {
   id: string;
-  date?: string;
-  description?: string;
-  amount?: string;
-  paidOn?: string | null;
-  quantity?: string;
-  unitRate?: string;
-  unit?: string;
-  notes?: string;
-  category?: string;
-  daysWorked?: string;
-  dailyRate?: string;
-  employeeId?: string;
-  employee?: { name: string; code: string };
-  direction?: string;
-  source?: string;
-  name?: string;
-  position?: string;
-  code?: string;
-  active?: boolean;
+  date: string;
+  dailyProduction?: string;
+  totalEarn?: string;
+  netSalary?: string;
+  netAmount?: string;
   updatedAt: string;
 };
 export type User = {
@@ -34,17 +20,24 @@ export type WorkspaceData = {
     name: string;
     currency: string;
     timezone: string;
-    openingCash: string;
     openingDate: string;
     updatedAt: string;
   };
   user: User;
   period: { label: string; mode: string; start: string; end: string };
-  totals: Record<string, string> & { activeEmployees: number };
+  totals: {
+    totalEarn: string;
+    netSalary: string;
+    netAmount: string;
+    totalCost: string;
+    netBalance: string;
+    dailyProduction: string;
+    productionDays: number;
+    salaryDays: number;
+    cashflowDays: number;
+  };
   trend: { day: string; revenue: string; costs: string }[];
-  breakdown: { category: string; amount: string }[];
   rows: RecordRow[];
-  employees: RecordRow[];
   count: number;
   page: number;
   pageSize: number;

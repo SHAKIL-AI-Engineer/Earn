@@ -13,15 +13,11 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ArrowDownLeft,
   ArrowDownToLine,
-  ArrowRight,
-  ArrowUpRight,
-  ChartNoAxesCombined,
   Check,
   ChevronDown,
   ChevronRight,
-  Banknote,
+  ChartNoAxesCombined,
   ClipboardList,
   Code2,
   Coins,
@@ -31,253 +27,239 @@ import {
   Menu,
   Package,
   PanelLeftClose,
-  Pencil,
   Plus,
   RefreshCw,
   Settings2,
   ShieldCheck,
   SunMoon,
-  Users,
   Wallet,
   X,
 } from "lucide-react";
-import type { Kind } from "@/lib/permissions";
-import { canExport, canWrite } from "@/lib/permissions";
+import { canExport, canWrite, type Kind } from "@/lib/permissions";
 import { formatMoney } from "@/lib/finance";
 import { today } from "@/lib/validation";
 import type { RecordRow, User, WorkspaceData } from "@/lib/client-types";
-import { RecordsTable } from "./records-table";
 import type { SortKey, SortDirection } from "@/lib/table-options";
 import { RecordForm } from "./record-form";
+import { RecordsTable } from "./records-table";
 import { ExportDialog } from "./export-dialog";
+import { UserForm } from "./user-form";
 const authClient = createAuthClient();
-const meta: Record<
-  string,
-  { title: string; subtitle: string; kind: Kind; label: string }
-> = {
+const meta: Record<string, { title: string; subtitle: string; kind: Kind }> = {
   dashboard: {
-    title: "Business overview",
-    subtitle: "A little clarity for your day. Here’s where things stand.",
+    title: "Daily overview",
+    subtitle: "Your daily totals, all in one place.",
     kind: "production",
-    label: "production",
   },
   production: {
-    title: "Daily production",
-    subtitle: "Track the work you do and the value it creates.",
+    title: "Production earnings",
+    subtitle:
+      "Date, daily production, and total earn. Nothing more to fill in.",
     kind: "production",
-    label: "production",
   },
   salaries: {
-    title: "Daily salaries",
-    subtitle: "Fair pay, clear records. Keep every working day accounted for.",
+    title: "Salary",
+    subtitle: "Enter the final salary total for each day.",
     kind: "salary",
-    label: "salary",
-  },
-  expenses: {
-    title: "Operating expenses",
-    subtitle: "Know where your money goes, down to the last detail.",
-    kind: "expense",
-    label: "expense",
   },
   cashflow: {
-    title: "Cash flow",
-    subtitle: "Follow what comes in, what goes out, and what’s left.",
-    kind: "cashEntry",
-    label: "cash adjustment",
-  },
-  employees: {
-    title: "Your people",
-    subtitle:
-      "The people behind the production. Manage your team’s daily rates.",
-    kind: "employee",
-    label: "employee",
+    title: "Cash flow expenses",
+    subtitle: "Enter the total money paid out for expenses each day.",
+    kind: "cashflow",
   },
   "reports/daily": {
     title: "Daily report",
-    subtitle: "One day. Every number. A complete picture of your business.",
+    subtitle: "A simple summary of one day’s earnings and costs.",
     kind: "production",
-    label: "production",
   },
   "reports/monthly": {
     title: "Monthly summary",
-    subtitle: "Step back and see the bigger picture, one month at a time.",
+    subtitle: "Your daily totals, added up for the month.",
     kind: "production",
-    label: "production",
   },
   team: {
-    title: "Users & permissions",
-    subtitle: "The right access for the right people.",
-    kind: "employee",
-    label: "user",
+    title: "Users & roles",
+    subtitle: "Choose who can view and update your records.",
+    kind: "production",
   },
   settings: {
     title: "Workspace settings",
-    subtitle: "Make Earn feel like your business.",
+    subtitle: "Keep your workspace details simple.",
     kind: "production",
-    label: "production",
   },
   system: {
-    title: "System architecture",
-    subtitle: "A clear foundation for a growing business.",
+    title: "Simple system design",
+    subtitle: "Three daily record types, with secure login and reporting.",
     kind: "production",
-    label: "production",
   },
 };
 const nav = [
   { href: "dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "production", label: "Production", icon: Package },
-  { href: "salaries", label: "Daily salaries", icon: Coins },
-  { href: "expenses", label: "Expenses", icon: Wallet },
-  { href: "cashflow", label: "Cash flow", icon: ChartNoAxesCombined },
-  { href: "employees", label: "Employees", icon: Users },
+  { href: "salaries", label: "Salary", icon: Coins },
+  { href: "cashflow", label: "Cash flow expenses", icon: Wallet },
 ];
+const kindLabel: Record<Kind, string> = {
+  production: "production",
+  salary: "salary",
+  cashflow: "cash flow expense",
+};
 export function Dashboard({ section, user }: { section: string; user: User }) {
-  const router = useRouter();
-  const m = meta[section];
-  const [mobile, setMobile] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
-  const [month, setMonth] = useState(() => today().slice(0, 7));
-  const [day, setDay] = useState(today);
-  const [period, setPeriod] = useState(
-    section === "reports/daily" ? "daily" : "monthly",
-  );
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [category, setCategory] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [sort, setSort] = useState<SortKey>(
-    m.kind === "employee" ? "label" : "date",
-  );
-  const [direction, setDirection] = useState<SortDirection>(
-    m.kind === "employee" ? "asc" : "desc",
-  );
-  const [data, setData] = useState<WorkspaceData | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [revision, setRevision] = useState(0);
-  const [form, setForm] = useState<{ row?: RecordRow } | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [toast, setToast] = useState("");
-  const [voiding, setVoiding] = useState<RecordRow | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [team, setTeam] = useState<User[]>([]);
-  const [userForm, setUserForm] = useState<User | null | undefined>(undefined);
-  const [activity, setActivity] = useState(false);
-  const requestRef = useRef(0);
-  const summaryRef = useRef("");
+  const router = useRouter(),
+    m = meta[section];
+  const reportView = section.startsWith("reports");
+  const management = ["team", "settings", "system"].includes(section);
+  const [recordKind, setRecordKind] = useState<Kind>(m.kind);
+  const kind = recordKind,
+    label = kindLabel[kind];
+  const [mobile, setMobile] = useState(false),
+    [collapsed, setCollapsed] = useState(false),
+    [month, setMonth] = useState(() => today().slice(0, 7)),
+    [day, setDay] = useState(today),
+    [period, setPeriod] = useState(
+      section === "reports/daily" ? "daily" : "monthly",
+    );
+  const [filterDate, setFilterDate] = useState(""),
+    [page, setPage] = useState(1),
+    [pageSize, setPageSize] = useState(20),
+    [sort, setSort] = useState<SortKey>("date"),
+    [direction, setDirection] = useState<SortDirection>("desc");
+  const [data, setData] = useState<WorkspaceData | null>(null),
+    [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [revision, setRevision] = useState(0),
+    [toast, setToast] = useState("");
+  const [form, setForm] = useState<{ row?: RecordRow } | null>(null),
+    [exporting, setExporting] = useState(false),
+    [voiding, setVoiding] = useState<RecordRow | null>(null),
+    [busy, setBusy] = useState(false),
+    [activity, setActivity] = useState(false),
+    [team, setTeam] = useState<User[]>([]),
+    [userForm, setUserForm] = useState<User | null | undefined>(undefined);
+  const requestRef = useRef(0),
+    summaryRef = useRef("");
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 4000);
     return () => clearTimeout(id);
   }, [toast]);
   useEffect(() => {
-    const ctrl = new AbortController();
-    const n = ++requestRef.current;
-    const timer = setTimeout(
-      async () => {
-        setLoading(true);
-        setError("");
-        try {
-          const summaryKey = `${period}/${month}/${day}`;
-          const q = new URLSearchParams({
-            summary: summaryRef.current === summaryKey ? "0" : "1",
+    const controller = new AbortController(),
+      n = ++requestRef.current;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const key = `${period}/${month}/${day}`,
+          q = new URLSearchParams({
+            period,
             month,
             day,
-            period,
-            kind: m.kind,
-            search,
-            status,
-            category,
+            kind,
+            date: filterDate,
             page: String(page),
             pageSize: String(pageSize),
             sort,
             direction,
+            summary: summaryRef.current === key ? "0" : "1",
           });
-          const r = await fetch(`/api/workspace?${q}`, {
-            signal: ctrl.signal,
+        const response = await fetch(`/api/workspace?${q}`, {
+            signal: controller.signal,
             cache: "no-store",
-          });
-          const d = await r.json();
-          if (r.status === 401 || r.status === 403) {
-            router.push("/login");
-            return;
-          }
-          if (!r.ok) throw new Error(d.error);
-          if (n === requestRef.current) {
-            setData((previous) => ({ ...previous, ...d }));
-            if (d.totals) summaryRef.current = summaryKey;
-          }
-          if (section === "team") {
-            const t = await fetch("/api/team", { signal: ctrl.signal });
-            if (t.ok) setTeam(await t.json());
-          }
-        } catch (e) {
-          if (e instanceof Error && e.name !== "AbortError")
-            setError(e.message);
-        } finally {
-          if (!ctrl.signal.aborted) setLoading(false);
+          }),
+          payload = await response.json();
+        if (response.status === 401 || response.status === 403) {
+          router.push("/login");
+          return;
         }
-      },
-      search ? 250 : 0,
-    );
+        if (!response.ok) throw new Error(payload.error);
+        if (n === requestRef.current) {
+          setData((previous) => ({ ...previous, ...payload }));
+          if (payload.totals) summaryRef.current = key;
+        }
+        if (section === "team") {
+          const response = await fetch("/api/team", {
+            signal: controller.signal,
+          });
+          if (response.ok) setTeam(await response.json());
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name !== "AbortError") setError(e.message);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 0);
     return () => {
       clearTimeout(timer);
-      ctrl.abort();
+      controller.abort();
     };
   }, [
+    period,
     month,
     day,
-    period,
-    m.kind,
-    search,
-    status,
-    category,
+    kind,
+    filterDate,
     page,
     pageSize,
     sort,
     direction,
     revision,
-    router,
     section,
+    router,
   ]);
-  const refresh = () => {
+  function refresh() {
     summaryRef.current = "";
     setRevision((v) => v + 1);
-  };
+  }
   function saved() {
     setForm(null);
     setUserForm(undefined);
-    setToast("Saved. Your reports are up to date.");
+    setToast("Saved. Your daily totals are up to date.");
     refresh();
+  }
+  function chooseKind(next: Kind) {
+    setRecordKind(next);
+    setSort("date");
+    setDirection("desc");
+    setPage(1);
+    setFilterDate("");
+    setData((previous) =>
+      previous ? { ...previous, rows: [], count: 0 } : null,
+    );
+  }
+  async function logout() {
+    await authClient.signOut();
+    router.push("/login");
+    router.refresh();
   }
   async function voidRecord() {
     if (!voiding) return;
     setBusy(true);
     try {
-      const r = await fetch(`/api/records/${m.kind}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: voiding.id, updatedAt: voiding.updatedAt }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+      const response = await fetch(`/api/records/${kind}`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: voiding.id,
+            updatedAt: voiding.updatedAt,
+          }),
+        }),
+        payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
       setVoiding(null);
-      setToast("Entry voided. The original remains in the audit trail.");
+      setToast("Daily record removed from totals. History is retained.");
       refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to void entry.");
+      setError(e instanceof Error ? e.message : "Unable to void record.");
     } finally {
       setBusy(false);
     }
   }
   useEffect(() => {
-    const open = Boolean(
-      form || exporting || userForm !== undefined || voiding || activity,
-    );
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const modal = document.querySelector<HTMLElement>('[aria-modal="true"]');
+    if (!(form || exporting || voiding || activity || userForm !== undefined))
+      return;
+    const previous = document.activeElement as HTMLElement | null,
+      modal = document.querySelector<HTMLElement>('[aria-modal="true"]');
     const elements = () =>
       Array.from(
         modal?.querySelectorAll<HTMLElement>(
@@ -289,38 +271,33 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
       if (e.key === "Escape" && !busy) {
         setForm(null);
         setExporting(false);
-        setUserForm(undefined);
         setVoiding(null);
         setActivity(false);
+        setUserForm(undefined);
       }
       if (e.key !== "Tab") return;
       const list = elements();
-      const first = list[0],
-        last = list.at(-1);
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && document.activeElement === list[0]) {
         e.preventDefault();
-        last?.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+        list.at(-1)?.focus();
+      } else if (!e.shiftKey && document.activeElement === list.at(-1)) {
         e.preventDefault();
-        first?.focus();
+        list[0]?.focus();
       }
     };
-    document.addEventListener("keydown", key);
-    const before = document.body.style.overflow;
+    const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", key);
     return () => {
       cancelAnimationFrame(frame);
+      document.body.style.overflow = overflow;
       document.removeEventListener("keydown", key);
-      document.body.style.overflow = before;
       previous?.focus();
     };
-  }, [form, exporting, userForm, voiding, activity, busy]);
-  const me = data?.user || user;
-  const exportAllowed = canExport(me.role);
-  const write = canWrite(me.role, m.kind);
-  const reportView = section.startsWith("reports");
-  const management = ["team", "settings", "system"].includes(section);
-  const t = data?.totals;
+  }, [form, exporting, voiding, activity, userForm, busy]);
+  const me = data?.user || user,
+    write = canWrite(me.role, kind),
+    t = data?.totals;
   return (
     <div
       className={`app-shell ${collapsed ? "sidebar-collapsed" : ""} ${mobile ? "mobile-open" : ""}`}
@@ -328,13 +305,13 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
       {mobile && (
         <button
           className="sidebar-scrim"
-          onClick={() => setMobile(false)}
           aria-label="Close navigation"
+          onClick={() => setMobile(false)}
         />
       )}
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <Link href="/dashboard" className="logo">
+          <Link className="logo" href="/dashboard">
             <span className="logo-icon">e</span>
             <span className="brand-name">
               earn<span className="accent">.</span>
@@ -342,81 +319,77 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
           </Link>
           <button
             className="icon-btn collapse-button"
-            onClick={() => setCollapsed(!collapsed)}
             aria-label="Collapse sidebar"
+            onClick={() => setCollapsed(!collapsed)}
           >
             <PanelLeftClose size={17} />
           </button>
           <button
             className="icon-btn mobile-close"
-            onClick={() => setMobile(false)}
             aria-label="Close menu"
+            onClick={() => setMobile(false)}
           >
             <X size={19} />
           </button>
         </div>
         <div className="workspace-badge">
           <span className="workspace-avatar">
-            {(data?.workspace.name || "W").slice(0, 1).toUpperCase()}
+            {(data?.workspace.name || "E").slice(0, 1)}
           </span>
           <div>
-            <strong>{data?.workspace.name || "Your workspace"}</strong>
-            <small>Business workspace</small>
+            <strong>{data?.workspace.name || "Earn Workspace"}</strong>
+            <small>Simple daily records</small>
           </div>
-          <ChevronDown size={14} />
         </div>
-        <span className="nav-label">WORKSPACE</span>
+        <span className="nav-label">DAILY RECORDS</span>
         <nav aria-label="Main navigation">
           {nav.map((n) => (
             <Link
-              key={n.href}
-              href={`/${n.href}`}
               className={`nav-item ${section === n.href ? "active" : ""}`}
+              href={`/${n.href}`}
+              key={n.href}
               title={n.label}
             >
               <n.icon size={18} />
               <span>{n.label}</span>
-              {section === n.href && <span className="nav-active-dot" />}
             </Link>
           ))}
           <details className="nav-group" open={reportView || undefined}>
-            <summary
-              className={reportView ? "nav-item active-parent" : "nav-item"}
-            >
+            <summary className="nav-item">
               <FileText size={18} />
               <span>Reports</span>
               <ChevronDown size={14} />
             </summary>
             <div className="submenu">
               <Link
-                href="/reports/daily"
                 className={section === "reports/daily" ? "active" : ""}
+                href="/reports/daily"
               >
                 Daily report
               </Link>
               <Link
-                href="/reports/monthly"
                 className={section === "reports/monthly" ? "active" : ""}
+                href="/reports/monthly"
               >
                 Monthly summary
               </Link>
             </div>
           </details>
         </nav>
-        <span className="nav-label">MANAGEMENT</span>
+        <span className="nav-label">WORKSPACE</span>
         <nav aria-label="Management navigation">
           {me.role === "admin" && (
             <>
               <Link
-                href="/team"
                 className={`nav-item ${section === "team" ? "active" : ""}`}
+                href="/team"
               >
                 <ShieldCheck size={18} />
                 <span>Users & roles</span>
               </Link>
               <Link
-                href="/settings"
                 className={`nav-item ${section === "settings" ? "active" : ""}`}
+                href="/settings"
               >
                 <Settings2 size={18} />
                 <span>Settings</span>
@@ -424,19 +397,19 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
             </>
           )}
           <Link
-            href="/system"
             className={`nav-item ${section === "system" ? "active" : ""}`}
+            href="/system"
           >
             <Code2 size={18} />
-            <span>Architecture</span>
+            <span>How it works</span>
           </Link>
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-tip">
             <span className="tip-icon">✦</span>
-            <strong>Good records. Better days.</strong>
+            <strong>Just the daily totals.</strong>
             <p>
-              Keep your daily entries up to date for a clearer monthly picture.
+              Add one record per day. Your monthly summary takes care of itself.
             </p>
           </div>
           <div className="sidebar-person">
@@ -445,15 +418,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
               <strong>{me.name}</strong>
               <small className="capitalize">{me.role}</small>
             </div>
-            <button
-              className="icon-btn"
-              aria-label="Sign out"
-              onClick={async () => {
-                await authClient.signOut();
-                router.push("/login");
-                router.refresh();
-              }}
-            >
+            <button className="icon-btn" aria-label="Sign out" onClick={logout}>
               <LogOut size={17} />
             </button>
           </div>
@@ -508,14 +473,9 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                 <strong>{me.name}</strong>
                 <small>{me.email}</small>
                 <span className="role-badge capitalize">{me.role}</span>
-                <button
-                  onClick={async () => {
-                    await authClient.signOut();
-                    router.push("/login");
-                    router.refresh();
-                  }}
-                >
-                  <LogOut size={15} /> Sign out
+                <button onClick={logout}>
+                  <LogOut size={15} />
+                  Sign out
                 </button>
               </div>
             </details>
@@ -525,17 +485,17 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
           <div className="page-heading">
             <div>
               <div className="page-eyebrow">
-                <span className="live-dot" /> YOUR BUSINESS, AT A GLANCE
+                <span className="live-dot" /> SIMPLE DAILY RECORDS
               </div>
               <h1>{m.title}</h1>
               <p>{m.subtitle}</p>
             </div>
             <div className="heading-actions">
-              {!management && exportAllowed && (
+              {!management && canExport(me.role) && (
                 <button
                   className="btn"
-                  disabled={!data || loading}
                   onClick={() => setExporting(true)}
+                  disabled={!data || loading}
                 >
                   <ArrowDownToLine size={16} />
                   Export report
@@ -546,18 +506,19 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                   className="btn primary"
                   onClick={() => setUserForm(null)}
                 >
-                  <Plus size={17} /> Add user
+                  <Plus size={17} />
+                  Add user
                 </button>
               ) : (
-                !reportView &&
                 !management &&
                 write && (
                   <button
                     className="btn primary"
-                    disabled={!data}
                     onClick={() => setForm({})}
+                    disabled={!data || loading}
                   >
-                    <Plus size={17} /> Add {m.label}
+                    <Plus size={17} />
+                    Add {label}
                   </button>
                 )
               )}
@@ -565,12 +526,13 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
           </div>
           {!management && (
             <div className="period-toolbar">
-              <div className="segmented" aria-label="Reporting period">
+              <div className="segmented">
                 <button
                   className={period === "monthly" ? "selected" : ""}
                   onClick={() => {
                     setPeriod("monthly");
                     setPage(1);
+                    setFilterDate("");
                   }}
                 >
                   Monthly
@@ -580,6 +542,7 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                   onClick={() => {
                     setPeriod("daily");
                     setPage(1);
+                    setFilterDate("");
                   }}
                 >
                   Daily
@@ -596,18 +559,18 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                     if (period === "monthly") setMonth(e.target.value);
                     else setDay(e.target.value);
                     setPage(1);
+                    setFilterDate("");
                   }}
                 />
               </label>
               <span className="toolbar-note">
-                {data?.period.label || "Loading period…"}{" "}
-                <span>· All amounts in BDT</span>
+                {data?.period.label || "Choose a period"} · ৳
               </span>
               <button
                 className="icon-btn"
+                aria-label="Refresh dashboard"
                 onClick={refresh}
                 disabled={loading}
-                aria-label="Refresh dashboard"
               >
                 <RefreshCw size={16} className={loading ? "spin" : ""} />
               </button>
@@ -619,11 +582,10 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
               <button onClick={refresh}>Try again</button>
             </div>
           )}
-          {loading && !data ? (
+          {!data && loading ? (
             <div className="loading-state">
-              <RefreshCw className="spin" size={26} />
-              <h3>Getting your workspace ready…</h3>
-              <p>Your records are being loaded securely.</p>
+              <RefreshCw size={25} className="spin" />
+              <h3>Loading your daily totals…</h3>
             </div>
           ) : (
             data && (
@@ -631,68 +593,40 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                 {!management && (
                   <>
                     <div className="metric-grid">
-                      {(section === "cashflow"
-                        ? [
-                            [
-                              "Opening cash",
-                              t?.openingCash,
-                              Wallet,
-                              "Available at period start",
-                            ],
-                            [
-                              "Cash received",
-                              t?.cashIn,
-                              ArrowDownLeft,
-                              "Actual payments received",
-                            ],
-                            [
-                              "Cash paid",
-                              t?.cashOut,
-                              ArrowUpRight,
-                              "Actual payments made",
-                            ],
-                            [
-                              "Closing cash",
-                              t?.closingCash,
-                              Banknote,
-                              "Opening + received − paid",
-                            ],
-                          ]
-                        : [
-                            [
-                              "Production earnings",
-                              t?.revenue,
-                              Package,
-                              `${t?.units} units produced`,
-                            ],
-                            [
-                              "Operating expenses",
-                              t?.expenses,
-                              Wallet,
-                              "Excludes daily salaries",
-                            ],
-                            [
-                              "Daily salaries",
-                              t?.salaries,
-                              Users,
-                              `${t?.activeEmployees} active employees`,
-                            ],
-                            [
-                              "Net earnings",
-                              t?.net,
-                              ChartNoAxesCombined,
-                              "Earnings − expenses − salaries",
-                            ],
-                          ]
-                      ).map(([label, value, Icon, note], i) => {
+                      {[
+                        [
+                          "Total Earn",
+                          t?.totalEarn,
+                          Package,
+                          `${t?.dailyProduction || 0} daily production`,
+                        ],
+                        [
+                          "Net Salary",
+                          t?.netSalary,
+                          Coins,
+                          `${t?.salaryDays || 0} daily records`,
+                        ],
+                        [
+                          "Cash Flow Expenses",
+                          t?.netAmount,
+                          Wallet,
+                          `${t?.cashflowDays || 0} daily records`,
+                        ],
+                        [
+                          "Net Balance",
+                          t?.netBalance,
+                          ChartNoAxesCombined,
+                          "Earn − salary − expenses",
+                        ],
+                      ].map(([title, value, Icon, note], i) => {
                         const Glyph = Icon as typeof Wallet;
                         return (
                           <article
                             className={`metric-card ${i === 3 ? "featured" : ""}`}
-                            key={String(label)}
+                            key={String(title)}
                           >
                             <div className="metric-top">
-                              <span>{String(label)}</span>
+                              <span>{String(title)}</span>
                               <span className="metric-icon">
                                 <Glyph size={17} />
                               </span>
@@ -704,275 +638,160 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                       })}
                     </div>
                     {(section === "dashboard" || reportView) && (
-                      <div className="chart-grid">
-                        <section className="panel trend-panel">
-                          <div className="panel-heading">
-                            <div>
-                              <h2>Earnings & costs</h2>
-                              <p>
-                                The shape of your{" "}
-                                {period === "daily" ? "day" : "month"}.
-                              </p>
-                            </div>
-                            <div className="chart-legend">
-                              <span>
-                                <i className="legend-earnings" />
-                                Earnings
-                              </span>
-                              <span>
-                                <i className="legend-costs" />
-                                Costs
-                              </span>
-                            </div>
+                      <section className="panel simple-trend">
+                        <div className="panel-heading">
+                          <div>
+                            <h2>Earnings & costs</h2>
+                            <p>Costs are net salary plus cash flow expenses.</p>
                           </div>
-                          <div className="chart-container">
-                            <ResponsiveContainer width="100%" height={235}>
-                              <AreaChart
-                                data={data.trend.map((r) => ({
-                                  ...r,
-                                  revenue: Number(r.revenue),
-                                  costs: Number(r.costs),
-                                }))}
-                                margin={{
-                                  top: 15,
-                                  right: 12,
-                                  left: -10,
-                                  bottom: 0,
+                          <div className="chart-legend">
+                            <span>
+                              <i className="legend-earnings" />
+                              Earnings
+                            </span>
+                            <span>
+                              <i className="legend-costs" />
+                              Costs
+                            </span>
+                          </div>
+                        </div>
+                        <div className="chart-container">
+                          <ResponsiveContainer width="100%" height={235}>
+                            <AreaChart
+                              data={data.trend.map((r) => ({
+                                ...r,
+                                revenue: Number(r.revenue),
+                                costs: Number(r.costs),
+                              }))}
+                              margin={{
+                                top: 15,
+                                right: 12,
+                                left: 0,
+                                bottom: 0,
+                              }}
+                            >
+                              <CartesianGrid
+                                vertical={false}
+                                stroke="var(--line)"
+                                strokeDasharray="4 5"
+                              />
+                              <XAxis
+                                dataKey="day"
+                                tickFormatter={(v) => String(v).slice(8)}
+                                tick={{ fill: "var(--muted)", fontSize: 10 }}
+                                axisLine={false}
+                                tickLine={false}
+                                minTickGap={22}
+                              />
+                              <YAxis
+                                tickFormatter={(v) =>
+                                  `৳${v >= 1000 ? `${v / 1000}k` : v}`
+                                }
+                                tick={{ fill: "var(--muted)", fontSize: 10 }}
+                                axisLine={false}
+                                tickLine={false}
+                              />
+                              <Tooltip
+                                formatter={(v) => formatMoney(Number(v))}
+                                contentStyle={{
+                                  background: "var(--panel)",
+                                  border: "1px solid var(--line)",
+                                  borderRadius: 8,
                                 }}
-                              >
-                                <defs>
-                                  <linearGradient
-                                    id="earnGradient"
-                                    x1="0"
-                                    y1="0"
-                                    x2="0"
-                                    y2="1"
-                                  >
-                                    <stop
-                                      offset="0%"
-                                      stopColor="#34bd97"
-                                      stopOpacity={0.23}
-                                    />
-                                    <stop
-                                      offset="100%"
-                                      stopColor="#34bd97"
-                                      stopOpacity={0}
-                                    />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid
-                                  vertical={false}
-                                  stroke="var(--line)"
-                                  strokeDasharray="4 5"
-                                />
-                                <XAxis
-                                  dataKey="day"
-                                  tickFormatter={(v) => String(v).slice(8)}
-                                  axisLine={false}
-                                  tickLine={false}
-                                  minTickGap={22}
-                                  tick={{ fill: "var(--muted)", fontSize: 10 }}
-                                />
-                                <YAxis
-                                  tickFormatter={(v) =>
-                                    `৳${v >= 1000 ? `${v / 1000}k` : v}`
-                                  }
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tick={{ fill: "var(--muted)", fontSize: 10 }}
-                                />
-                                <Tooltip
-                                  contentStyle={{
-                                    background: "var(--panel)",
-                                    border: "1px solid var(--line)",
-                                    borderRadius: 8,
-                                    color: "var(--text)",
-                                  }}
-                                  formatter={(v) => formatMoney(Number(v))}
-                                />
-                                <Area
-                                  isAnimationActive={false}
-                                  type="monotone"
-                                  dataKey="revenue"
-                                  name="Earnings"
-                                  stroke="#34bd97"
-                                  fill="url(#earnGradient)"
-                                  strokeWidth={2.5}
-                                />
-                                <Area
-                                  isAnimationActive={false}
-                                  type="monotone"
-                                  dataKey="costs"
-                                  name="Costs"
-                                  stroke="#8d9dec"
-                                  fill="transparent"
-                                  strokeWidth={2}
-                                  strokeDasharray="4 3"
-                                />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          </div>
-                          {data.trend.every(
-                            (r) =>
-                              Number(r.revenue) === 0 && Number(r.costs) === 0,
-                          ) && (
-                            <p className="chart-empty">
-                              Add your first entry to start seeing the bigger
-                              picture.
-                            </p>
-                          )}
-                        </section>
-                        <section className="panel breakdown-panel">
-                          <div className="panel-heading">
-                            <div>
-                              <h2>Where it goes</h2>
-                              <p>Operating expenses by category.</p>
-                            </div>
-                            <Wallet size={18} className="muted" />
-                          </div>
-                          <div className="breakdown-total">
-                            {formatMoney(t?.expenses || "0")}
-                            <span>Total expenses</span>
-                          </div>
-                          {data.breakdown.length ? (
-                            data.breakdown
-                              .sort(
-                                (a, b) => Number(b.amount) - Number(a.amount),
-                              )
-                              .map((b, i) => (
-                                <div
-                                  className="breakdown-item"
-                                  key={b.category}
-                                >
-                                  <div>
-                                    <span>
-                                      <i
-                                        style={{
-                                          background: [
-                                            "#34bd97",
-                                            "#8d9dec",
-                                            "#dba96c",
-                                            "#78a8d6",
-                                          ][i % 4],
-                                        }}
-                                      />
-                                      {b.category}
-                                    </span>
-                                    <strong>{formatMoney(b.amount)}</strong>
-                                  </div>
-                                  <div className="progress-track">
-                                    <div
-                                      style={{
-                                        width: `${(Number(b.amount) / Math.max(1, Number(t?.expenses))) * 100}%`,
-                                        background: [
-                                          "#34bd97",
-                                          "#8d9dec",
-                                          "#dba96c",
-                                          "#78a8d6",
-                                        ][i % 4],
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                              ))
-                          ) : (
-                            <div className="mini-empty">
-                              <Wallet size={23} />
-                              <p>No expenses recorded yet.</p>
-                            </div>
-                          )}
-                        </section>
-                      </div>
-                    )}
-                    {(section === "cashflow" || reportView) && (
-                      <div className="cash-summary panel">
-                        <div>
-                          <span className="eyebrow">CASH POSITION</span>
-                          <h2>{formatMoney(t?.closingCash || "0")}</h2>
-                          <p>Closing cash for {data.period.label}</p>
+                              />
+                              <Area
+                                dataKey="revenue"
+                                name="Total Earn"
+                                stroke="#34bd97"
+                                fill="#34bd9715"
+                                strokeWidth={2}
+                                isAnimationActive={false}
+                              />
+                              <Area
+                                dataKey="costs"
+                                name="Total Costs"
+                                stroke="#8d9dec"
+                                fill="transparent"
+                                strokeWidth={2}
+                                isAnimationActive={false}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
                         </div>
-                        <div>
-                          <span>
-                            Opening balance
-                            <strong>
-                              {formatMoney(t?.openingCash || "0")}
-                            </strong>
-                          </span>
-                          <span className="positive">
-                            + Cash received
-                            <strong>{formatMoney(t?.cashIn || "0")}</strong>
-                          </span>
-                          <span>
-                            − Cash paid
-                            <strong>{formatMoney(t?.cashOut || "0")}</strong>
-                          </span>
-                        </div>
-                      </div>
+                      </section>
                     )}
                     <section className="panel records-panel">
                       <div className="panel-heading">
                         <div>
                           <h2>
-                            {section === "dashboard" || reportView
+                            {kind === "production"
                               ? "Production records"
-                              : section === "cashflow"
-                                ? "Cash activity"
-                                : m.title}
+                              : kind === "salary"
+                                ? "Salary records"
+                                : "Cash flow expense records"}
                           </h2>
                           <p>
-                            {section === "cashflow"
-                              ? "All receipts, payments and adjustments, by payment date."
-                              : "Your records for the selected period."}
+                            {kind === "production"
+                              ? "Date · Daily Production · Total Earn"
+                              : kind === "salary"
+                                ? "Date · Net Salary"
+                                : "Date · Net Amount"}
                           </p>
                         </div>
-                        <span className="count-badge">
-                          {data.count} {data.count === 1 ? "record" : "records"}
-                        </span>
+                        <span className="count-badge">One total per date</span>
                       </div>
+                      {(section === "dashboard" || reportView) && (
+                        <div
+                          className="record-tabs"
+                          role="tablist"
+                          aria-label="Daily record type"
+                        >
+                          {(["production", "salary", "cashflow"] as Kind[]).map(
+                            (k) => (
+                              <button
+                                role="tab"
+                                key={k}
+                                aria-selected={kind === k}
+                                className={kind === k ? "selected" : ""}
+                                onClick={() => chooseKind(k)}
+                              >
+                                {k === "production"
+                                  ? "Production"
+                                  : k === "salary"
+                                    ? "Salary"
+                                    : "Cash flow expenses"}
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      )}
                       <RecordsTable
-                        kind={m.kind}
-                        label={m.label}
+                        kind={kind}
+                        label={label}
                         data={data}
                         loading={loading}
                         write={write}
-                        search={search}
-                        status={status}
-                        category={category}
-                        page={page}
+                        filterDate={filterDate}
                         pageSize={pageSize}
                         sort={sort}
                         direction={direction}
-                        onSearch={(value) => {
-                          setSearch(value);
-                          setPage(1);
-                        }}
-                        onStatus={(value) => {
-                          setStatus(value);
-                          setPage(1);
-                        }}
-                        onCategory={(value) => {
-                          setCategory(value);
+                        onDate={(v) => {
+                          setFilterDate(v);
                           setPage(1);
                         }}
                         onPage={setPage}
-                        onPageSize={(value) => {
-                          setPageSize(value);
+                        onPageSize={(v) => {
+                          setPageSize(v);
                           setPage(1);
                         }}
-                        onSort={(key, targetDirection) => {
+                        onSort={(key, dir) => {
                           setSort(key);
                           setDirection(
-                            targetDirection ||
+                            dir ||
                               (sort === key && direction === "asc"
                                 ? "desc"
                                 : "asc"),
                           );
-                          setPage(1);
-                        }}
-                        onClear={() => {
-                          setSearch("");
-                          setStatus("");
-                          setCategory("");
                           setPage(1);
                         }}
                         onAdd={() => setForm({})}
@@ -980,80 +799,56 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                         onVoid={setVoiding}
                       />
                     </section>
-                    <div className="dashboard-footnote">
-                      <ShieldCheck size={14} />
-                      <span>
-                        Private workspace · Earnings use entry dates. Cash flow
-                        uses payment dates.
-                      </span>
-                      <span>
-                        Unpaid: {formatMoney(t?.receivable || "0")} receivable ·{" "}
-                        {formatMoney(t?.payable || "0")} payable
-                      </span>
-                    </div>
+                    <p className="simple-footer-note">
+                      Net Balance = Total Earn − Net Salary − Cash Flow
+                      Expenses. All amounts are in ৳.
+                    </p>
                   </>
                 )}
                 {section === "team" && (
                   <>
                     <div className="role-cards">
                       {[
-                        ["Admin", "Full control, users and settings"],
-                        ["Manager", "Production, employees and salaries"],
-                        ["Accountant", "Expenses, salaries and cash"],
-                        ["Viewer", "Read-only financial access"],
-                      ].map(([r, d]) => (
+                        ["Admin", "All records, users and settings"],
+                        ["Manager", "Production and salary"],
+                        ["Accountant", "Salary and cash flow expenses"],
+                        ["Viewer", "Read-only reports"],
+                      ].map(([r, n]) => (
                         <div className="panel" key={r}>
                           <ShieldCheck size={19} />
                           <h3>{r}</h3>
-                          <p>{d}</p>
+                          <p>{n}</p>
                         </div>
                       ))}
                     </div>
                     <section className="panel">
                       <div className="panel-heading">
-                        <div>
-                          <h2>Workspace members</h2>
-                          <p>Role changes revoke existing sessions.</p>
-                        </div>
-                        <span className="count-badge">
-                          {team.length} members
-                        </span>
+                        <h2>Workspace members</h2>
                       </div>
                       <div className="table-scroll">
                         <table>
                           <thead>
                             <tr>
-                              <th>NAME</th>
-                              <th>EMAIL</th>
-                              <th>ROLE</th>
-                              <th>STATUS</th>
-                              <th />
+                              <th>Name</th>
+                              <th>Email</th>
+                              <th>Role</th>
+                              <th>Status</th>
+                              <th>Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             {team.map((u) => (
                               <tr key={u.id}>
-                                <td className="row-title">{u.name}</td>
+                                <td>{u.name}</td>
                                 <td>{u.email}</td>
-                                <td>
-                                  <span className="role-badge capitalize">
-                                    {u.role}
-                                  </span>
-                                </td>
-                                <td>
-                                  <span
-                                    className={`status-badge ${u.active ? "paid" : "pending"}`}
-                                  >
-                                    {u.active ? "Active" : "Inactive"}
-                                  </span>
-                                </td>
+                                <td className="capitalize">{u.role}</td>
+                                <td>{u.active ? "Active" : "Inactive"}</td>
                                 <td>
                                   <button
-                                    className="icon-btn"
-                                    aria-label={`Edit ${u.name}`}
+                                    className="btn"
                                     onClick={() => setUserForm(u)}
                                   >
-                                    <Pencil size={15} />
+                                    Edit member
                                   </button>
                                 </td>
                               </tr>
@@ -1074,13 +869,13 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
         </main>
         <footer className="app-footer">
           <span>© 2026 Earn</span>
-          <span>Good records. Better decisions.</span>
+          <span>Three simple daily records.</span>
           <span className="capitalize">{me.role} access</span>
         </footer>
       </div>
       {form && data && (
         <RecordForm
-          kind={m.kind}
+          kind={kind}
           row={form.row}
           day={
             period === "daily"
@@ -1089,7 +884,6 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
                 ? day
                 : month + "-01"
           }
-          employees={data.employees}
           onClose={() => setForm(null)}
           onSaved={saved}
         />
@@ -1119,49 +913,49 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
             aria-labelledby="void-title"
           >
             <div className="modal-heading">
-              <h2 id="void-title">Void this entry?</h2>
+              <h2 id="void-title">Void this daily record?</h2>
               <button
                 className="icon-btn"
-                onClick={() => setVoiding(null)}
                 aria-label="Close confirmation"
+                onClick={() => setVoiding(null)}
               >
-                <X size={19} />
+                <X size={20} />
               </button>
             </div>
             <p className="muted">
-              This removes the entry from reports and cash balances. The
-              original record stays in the audit trail.
+              The daily record will be excluded from reports. Its history is
+              retained.
             </p>
             <strong className="void-description">
-              {voiding.description || voiding.employee?.name} ·{" "}
-              {formatMoney(voiding.amount || "0")}
+              {voiding.date.slice(0, 10)} ·{" "}
+              {formatMoney(
+                voiding.totalEarn ||
+                  voiding.netSalary ||
+                  voiding.netAmount ||
+                  "0",
+              )}
             </strong>
             <div className="modal-footer">
               <button
                 className="btn"
-                disabled={busy}
                 onClick={() => setVoiding(null)}
+                disabled={busy}
               >
-                Keep entry
+                Keep record
               </button>
               <button
                 className="btn danger-btn"
-                disabled={busy}
                 onClick={voidRecord}
+                disabled={busy}
               >
-                {busy ? "Voiding…" : "Void entry"}
+                {busy ? "Voiding…" : "Void record"}
               </button>
             </div>
           </section>
         </div>
       )}
       {activity && data && (
-        <div
-          className="modal-backdrop"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setActivity(false);
-          }}
-        >
+        <div className="modal-backdrop">
           <section
             className="modal"
             role="dialog"
@@ -1172,8 +966,8 @@ export function Dashboard({ section, user }: { section: string; user: User }) {
               <h2 id="activity-title">Recent activity</h2>
               <button
                 className="icon-btn"
-                onClick={() => setActivity(false)}
                 aria-label="Close activity"
+                onClick={() => setActivity(false)}
               >
                 <X size={20} />
               </button>
@@ -1209,23 +1003,23 @@ function SettingsPanel({
   data: WorkspaceData;
   onSaved: () => void;
 }) {
-  const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(false),
+    [error, setError] = useState("");
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
     setError("");
     try {
-      const r = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...Object.fromEntries(new FormData(e.currentTarget)),
-          updatedAt: data.workspace.updatedAt,
+      const response = await fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...Object.fromEntries(new FormData(e.currentTarget)),
+            updatedAt: data.workspace.updatedAt,
+          }),
         }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+        payload = await response.json();
+      if (!response.ok) throw new Error(payload.error);
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save.");
@@ -1237,9 +1031,6 @@ function SettingsPanel({
     <div className="settings-grid">
       <form className="panel settings-panel" onSubmit={save}>
         <h2>Workspace details</h2>
-        <p className="muted">
-          Your business information and cash starting point.
-        </p>
         <label>
           Workspace name
           <input
@@ -1250,29 +1041,13 @@ function SettingsPanel({
           />
         </label>
         <label>
-          Opening cash balance (৳)
-          <input
-            name="openingCash"
-            type="number"
-            step="0.01"
-            defaultValue={data.workspace.openingCash}
-            required
-          />
+          Currency
+          <input value="BDT — Bangladeshi Taka (৳)" readOnly />
         </label>
-        <p className="field-help">
-          Changing the opening balance recalculates all historical cash
-          balances. The change is recorded in the audit trail.
-        </p>
-        <div className="form-grid">
-          <label>
-            Currency
-            <input value="BDT — Bangladeshi Taka (৳)" readOnly />
-          </label>
-          <label>
-            Business timezone
-            <input value="Asia/Dhaka" readOnly />
-          </label>
-        </div>
+        <label>
+          Business timezone
+          <input value="Asia/Dhaka" readOnly />
+        </label>
         <label>
           Opening date
           <input value={data.workspace.openingDate.slice(0, 10)} readOnly />
@@ -1286,232 +1061,50 @@ function SettingsPanel({
           {pending ? "Saving…" : "Save settings"}
         </button>
       </form>
-      <div className="panel settings-panel">
-        <h2>How the numbers work</h2>
+      <section className="panel settings-panel">
+        <h2>How the totals work</h2>
         <div className="explanation">
-          <strong>Production earnings</strong>
-          <p>Quantity × unit rate, rounded per entry.</p>
-          <strong>Daily salaries</strong>
+          <strong>Production</strong>
+          <p>Enter daily production and the final Total Earn directly.</p>
+          <strong>Salary</strong>
+          <p>Enter one Net Salary total per date.</p>
+          <strong>Cash flow expenses</strong>
+          <p>Enter one Net Amount for money paid out per date.</p>
+          <strong>Monthly summary</strong>
           <p>
-            Days worked × daily rate. One entry per employee per day; fractional
-            days are supported.
-          </p>
-          <strong>Net earnings</strong>
-          <p>Production earnings − operating expenses − salaries.</p>
-          <strong>Closing cash</strong>
-          <p>
-            Opening cash + actual receipts − actual payments. Owner adjustments
-            affect cash only.
+            The app adds up the daily records. Net Balance is Total Earn minus
+            Net Salary and Cash Flow Expenses.
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-function UserForm({
-  user,
-  onClose,
-  onSaved,
-}: {
-  user: User | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  async function save(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setPending(true);
-    setError("");
-    const values: Record<string, unknown> = Object.fromEntries(
-      new FormData(e.currentTarget),
-    );
-    if (!values.password) delete values.password;
-    values.active = values.active !== "false";
-    try {
-      const r = await fetch("/api/team", {
-        method: user ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...values,
-          id: user?.id,
-          updatedAt: user?.updatedAt,
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      onSaved();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to save user.");
-    } finally {
-      setPending(false);
-    }
-  }
-  return (
-    <div className="modal-backdrop">
-      <section
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="user-title"
-      >
-        <div className="modal-heading">
-          <h2 id="user-title">
-            {user ? "Edit member" : "Add workspace member"}
-          </h2>
-          <button
-            className="icon-btn"
-            aria-label="Close user form"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </button>
-        </div>
-        <form onSubmit={save}>
-          <label>
-            Full name
-            <input
-              name="name"
-              defaultValue={user?.name}
-              required
-              autoFocus
-              maxLength={160}
-            />
-          </label>
-          {!user && (
-            <label>
-              Email address
-              <input name="email" type="email" required />
-            </label>
-          )}
-          <label>
-            {user ? "Reset password (optional)" : "Initial password"}
-            <input
-              name="password"
-              type="password"
-              minLength={12}
-              maxLength={128}
-              required={!user}
-              autoComplete="new-password"
-              placeholder="At least 12 characters"
-            />
-          </label>
-          <label>
-            Role
-            <select name="role" defaultValue={user?.role || "viewer"}>
-              {["admin", "manager", "accountant", "viewer"].map((r) => (
-                <option key={r} value={r}>
-                  {r[0].toUpperCase() + r.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {user && (
-            <label>
-              Status
-              <select name="active" defaultValue={String(user.active)}>
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
-            </label>
-          )}
-          <p className="field-help">
-            Share credentials privately. Users cannot register themselves;
-            administrators control access.
-          </p>
-          {error && (
-            <div className="notice error" role="alert">
-              {error}
-            </div>
-          )}
-          <div className="modal-footer">
-            <button type="button" className="btn" onClick={onClose}>
-              Cancel
-            </button>
-            <button className="btn primary" disabled={pending}>
-              {pending ? "Saving…" : "Save member"}
-            </button>
-          </div>
-        </form>
       </section>
     </div>
   );
 }
 function SystemDesign() {
   return (
-    <div className="system-design">
-      <div className="panel architecture-panel">
-        <span className="eyebrow">HIGH-LEVEL SYSTEM DESIGN</span>
-        <h2>One workspace. Clear boundaries.</h2>
-        <p className="muted">
-          A modular Next.js application with a single source of truth in Neon
-          PostgreSQL.
-        </p>
-        <div className="architecture-flow">
-          {[
-            [
-              "01",
-              "Presentation",
-              "Responsive dashboard · light/dark theme · report preview",
-            ],
-            [
-              "02",
-              "Application & access",
-              "Better Auth sessions → server-side role checks → validated requests",
-            ],
-            [
-              "03",
-              "Business services",
-              "Production · salaries · expenses · cash flow · reporting",
-            ],
-            [
-              "04",
-              "Persistence",
-              "Prisma ORM → Neon PostgreSQL · atomic writes + audit log",
-            ],
-            [
-              "05",
-              "Delivery",
-              "Vercel Node.js functions · private PDF streaming",
-            ],
-          ].map(([n, t, d]) => (
-            <div key={n}>
-              <span>{n}</span>
-              <section>
-                <h3>{t}</h3>
-                <p>{d}</p>
-              </section>
-              <ArrowRight size={20} />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="role-cards">
+    <section className="panel architecture-panel">
+      <span className="eyebrow">SIMPLE APPLICATION DESIGN</span>
+      <h2>Three daily record types.</h2>
+      <div className="architecture-flow">
         {[
-          [
-            "Exact money",
-            "Decimal storage and per-entry rounding avoid floating-point totals.",
-          ],
-          [
-            "Real access control",
-            "Every private API checks the current session, role and active status.",
-          ],
-          [
-            "Traceable records",
-            "Financial records are voided rather than deleted. Changes and audit logs commit together.",
-          ],
-          [
-            "Consistent reporting",
-            "Daily and monthly aggregates use a consistent database snapshot.",
-          ],
-        ].map(([t, d]) => (
-          <section className="panel" key={t}>
-            <ShieldCheck size={20} />
-            <h3>{t}</h3>
-            <p>{d}</p>
-          </section>
+          ["01", "Salary", "Date · Net Salary"],
+          ["02", "Cashflow", "Date · Net Amount (expenses only)"],
+          ["03", "Production", "Date · Daily Production · Total Earn"],
+        ].map(([n, t, d]) => (
+          <div key={n}>
+            <span>{n}</span>
+            <section>
+              <h3>{t}</h3>
+              <p>{d}</p>
+            </section>
+          </div>
         ))}
       </div>
-    </div>
+      <p className="simple-footer-note">
+        Next.js → server permissions and validation → Prisma → Neon PostgreSQL.
+        Daily and monthly reports use the same totals. Better Auth handles
+        login.
+      </p>
+    </section>
   );
 }

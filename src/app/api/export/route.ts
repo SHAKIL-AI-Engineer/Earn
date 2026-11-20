@@ -1,126 +1,67 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { actor, failure, HttpError } from "@/lib/http";
-import { canExport } from "@/lib/permissions";
+import { canExport, kinds, type Kind } from "@/lib/permissions";
 import { periodFrom, report } from "@/lib/reports";
 import { db } from "@/lib/db";
-import { cashbook } from "@/lib/cashbook";
+import { resource } from "@/lib/records";
 import { ReportPdf, type PdfSection } from "@/components/report-pdf";
 export async function GET(request: Request) {
   try {
     const user = await actor();
     if (!canExport(user.role))
       throw new HttpError(403, "Your role cannot export reports.");
-    const q = new URL(request.url).searchParams;
-    const period = periodFrom(q);
+    const q = new URL(request.url).searchParams,
+      period = periodFrom(q);
+    const selected = (q.get("sections") ?? "production,salary,cashflow")
+      .split(",")
+      .filter(Boolean);
+    if (selected.some((k) => !kinds.includes(k as Kind)))
+      throw new HttpError(400, "Unknown report section.");
     const { data, sections } = await db().$transaction(
       async (tx) => {
         const data = await report(period, tx);
         const sections: PdfSection[] = [];
-        const where = {
-          date: { gte: period.start, lt: period.end },
-          voidedAt: null,
-        };
-        const enabled = new Set(
-          (q.get("sections") ?? "production,expense,salary,cash").split(","),
-        );
-        const dt = (d: Date) => d.toISOString().slice(0, 10);
-        if (q.get("detail") !== "summary") {
-          if (enabled.has("production")) {
-            const rows = await tx.production.findMany({
-              where,
+        const titles = {
+            production: "Production",
+            salary: "Salary",
+            cashflow: "Cash Flow Expenses",
+          },
+          labels = {
+            production: "Total Earn",
+            salary: "Net Salary",
+            cashflow: "Net Amount",
+          };
+        if (q.get("detail") !== "summary")
+          for (const key of [...new Set(selected)] as Kind[]) {
+            const rows = await resource(tx, key).findMany({
+              where: {
+                voidedAt: null,
+                date: { gte: period.start, lt: period.end },
+              },
               orderBy: { date: "asc" },
-              take: 2001,
             });
-            if (rows.length > 2000)
-              throw new HttpError(
-                422,
-                "Choose a daily report; this section exceeds 2,000 records.",
-              );
             sections.push({
-              title: "Daily production",
-              rows: rows.map((r) => ({
-                date: dt(r.date),
-                label: r.description,
-                detail: `${r.quantity} ${r.unit} × ৳${r.unitRate}`,
-                amount: r.amount.toFixed(2),
-                status: r.paidOn ? `Paid ${dt(r.paidOn)}` : "Pending",
+              kind: key,
+              title: titles[key],
+              amountLabel: labels[key],
+              rows: rows.map((row) => ({
+                date: (row.date as Date).toISOString().slice(0, 10),
+                ...(key === "production"
+                  ? { dailyProduction: String(row.dailyProduction) }
+                  : {}),
+                amount: String(
+                  key === "production"
+                    ? row.totalEarn
+                    : key === "salary"
+                      ? row.netSalary
+                      : row.netAmount,
+                ),
               })),
             });
           }
-          if (enabled.has("expense")) {
-            const rows = await tx.expense.findMany({
-              where,
-              orderBy: { date: "asc" },
-              take: 2001,
-            });
-            if (rows.length > 2000)
-              throw new HttpError(
-                422,
-                "Choose a daily report; this section exceeds 2,000 records.",
-              );
-            sections.push({
-              title: "Operating expenses",
-              rows: rows.map((r) => ({
-                date: dt(r.date),
-                label: r.description,
-                detail: r.category,
-                amount: r.amount.toFixed(2),
-                status: r.paidOn ? `Paid ${dt(r.paidOn)}` : "Pending",
-              })),
-            });
-          }
-          if (enabled.has("salary")) {
-            const rows = await tx.salary.findMany({
-              where,
-              include: { employee: true },
-              orderBy: { date: "asc" },
-              take: 2001,
-            });
-            if (rows.length > 2000)
-              throw new HttpError(
-                422,
-                "Choose a daily report; this section exceeds 2,000 records.",
-              );
-            sections.push({
-              title: "Daily salaries",
-              rows: rows.map((r) => ({
-                date: dt(r.date),
-                label: r.employee.name,
-                detail: `${r.daysWorked} day × ৳${r.dailyRate}`,
-                amount: r.amount.toFixed(2),
-                status: r.paidOn ? `Paid ${dt(r.paidOn)}` : "Pending",
-              })),
-            });
-          }
-          if (enabled.has("cash")) {
-            const rows = await cashbook(
-              period.start,
-              period.end,
-              "",
-              1,
-              2001,
-              tx,
-            );
-            if (rows.length > 2000)
-              throw new HttpError(
-                422,
-                "Choose a daily report; cash activity exceeds 2,000 records.",
-              );
-            sections.push({
-              title: "Cash activity by payment date",
-              rows: rows.map((r) => ({
-                date: dt(r.date),
-                label: r.description,
-                detail: r.source,
-                amount: r.amount.toFixed(2),
-                status: r.direction === "IN" ? "Cash in" : "Cash out",
-              })),
-            });
-          }
-        }
         return { data, sections };
       },
-      { isolationLevel: "RepeatableRead", timeout: 30000 },
+      { isolationLevel: "RepeatableRead", timeout: 20000 },
     );
     const buffer = await renderToBuffer(
       ReportPdf({
